@@ -3,7 +3,7 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: CONEXÃO HÍBRIDA (PC/ONLINE) E LIMPEZA DE PEM NO SECRETS
+# AJUSTE: CORREÇÃO DEFINITIVA DE CONEXÃO SECRETS/PEM (SEM PREJUÍZO)
 # =================================================================
 
 import streamlit as st
@@ -28,13 +28,17 @@ def conectar_banco_vrs():
                 cred_dict = dict(st.secrets["textkey"])
                 
                 # BLINDAGEM VRS: Limpeza profunda da chave privada
-                # Corrige erros de "Unable to load PEM file" causados por formatação
+                # Resolve o erro "Unable to load PEM file" (InvalidByte 61)
                 p_key = cred_dict.get("private_key", "")
                 
-                # Remove aspas extras, espaços e converte \n literais para quebras de linha reais
+                # Remove aspas extras, espaços e garante que as quebras de linha sejam reais (\n)
                 p_key = p_key.strip().strip('"').strip("'")
+                
                 if "\\n" in p_key:
                     p_key = p_key.replace("\\n", "\n")
+                
+                # Garante que não existam espaços duplos ou erros de colagem no sinal de igual (=)
+                p_key = p_key.replace(" =", "=").replace("= ", "=")
                 
                 cred_dict["private_key"] = p_key
                 
@@ -54,7 +58,7 @@ def conectar_banco_vrs():
                     
         return firestore.client()
     except Exception as e:
-        # Reporte detalhado para a VRS Soluções
+        # Reporte detalhado para a VRS Soluções para facilitar diagnóstico
         st.error(f"Erro de Conexão Segura VRS: {e}")
         return None
 
