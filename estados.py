@@ -14,7 +14,7 @@ def obter_estados_vrs():
     ]
 
 def obter_estados_com_todos_vrs():
-    """Lista de estados com a opção de filtro geral."""
+    """Lista de estados com a opção de filtro geral 'Todos'."""
     lista = ["Todos"]
     lista.extend(obter_estados_vrs())
     return lista
