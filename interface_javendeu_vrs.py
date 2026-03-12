@@ -3,7 +3,7 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: CORREÇÃO DEFINITIVA DE CONEXÃO E LIMPEZA DE INTERFACE
+# AJUSTE: BLINDAGEM DE CONEXÃO E CORREÇÃO DE REDIRECIONAMENTO SECRETS
 # =================================================================
 
 import streamlit as st
@@ -21,25 +21,38 @@ st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", pa
 # --- CONEXÃO FIREBASE (BLINDAGEM TOTAL VRS) ---
 @st.cache_resource
 def conectar_banco_vrs():
-    """Realiza a conexão segura com o Firestore da VRS Soluções."""
+    """Realiza a conexão segura com o Firestore da VRS Soluções com limpeza bruta de chaves."""
     try:
         if not firebase_admin._apps:
-            # 1. TENTA VIA SECRETS (PARA DEPLOY NO STREAMLIT CLOUD)
+            # 1. TENTA VIA SECRETS (MODO PRODUÇÃO)
             if "textkey" in st.secrets:
-                cred_dict = dict(st.secrets["textkey"])
+                # Criamos um dicionário limpo para evitar erros de leitura do TOML
+                cred_dict = {}
+                for chave in ["type", "project_id", "private_key_id", "private_key", 
+                             "client_email", "client_id", "auth_uri", "token_uri", 
+                             "auth_provider_x509_cert_url", "client_x509_cert_url"]:
+                    if chave in st.secrets["textkey"]:
+                        cred_dict[chave] = st.secrets["textkey"][chave]
                 
-                # TRATAMENTO AVANÇADO DA CHAVE PRIVADA
+                # LIMPEZA PROFISSIONAL DA PRIVATE KEY (Onde o erro costuma estar)
                 if "private_key" in cred_dict:
-                    # Garante que as quebras de linha sejam interpretadas corretamente
-                    p_key = cred_dict["private_key"].replace("\\n", "\n")
-                    # Remove eventuais aspas extras que o TOML pode inserir
-                    p_key = p_key.strip().strip('"').strip("'")
-                    cred_dict["private_key"] = p_key
+                    pk = cred_dict["private_key"]
+                    # Remove quebras de linha literais escritas como texto
+                    pk = pk.replace("\\n", "\n")
+                    # Remove aspas que o usuário pode ter colado junto
+                    pk = pk.strip().strip('"').strip("'")
+                    # Garante os delimitadores PEM corretos
+                    if "-----BEGIN PRIVATE KEY-----" not in pk:
+                        pk = "-----BEGIN PRIVATE KEY-----\n" + pk
+                    if "-----END PRIVATE KEY-----" not in pk:
+                        pk = pk + "\n-----END PRIVATE KEY-----"
+                    
+                    cred_dict["private_key"] = pk
                 
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
             
-            # 2. TENTA VIA ARQUIVO (PARA USO EM PC LOCAL)
+            # 2. TENTA VIA ARQUIVO (MODO LOCAL)
             else:
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 path_json = os.path.join(base_dir, "vrs-solucoes-firebase-adminsdk.json")
@@ -47,12 +60,13 @@ def conectar_banco_vrs():
                     cred = credentials.Certificate(path_json)
                     firebase_admin.initialize_app(cred)
                 else:
-                    st.error("Erro Crítico: Configure os Secrets no painel do Streamlit ou adicione o JSON.")
+                    # Se cair aqui, o Streamlit vai mostrar o link do navegador de Secrets
+                    st.error("⚠️ VRS Soluções: Credenciais não encontradas nos Secrets ou no arquivo JSON.")
                     return None
                     
         return firestore.client()
     except Exception as e:
-        st.error(f"Erro de Conexão Segura VRS: {e}")
+        st.error(f"❌ Erro de Autenticação VRS: {e}")
         return None
 
 # Inicializa o banco de dados oficial
@@ -102,6 +116,7 @@ with header_col3:
         esta_logado = usuarios_vrs.gerenciar_acesso(db)
     else:
         esta_logado = False
+        st.warning("Banco de Dados Offline.")
 
 st.markdown("---")
 menu = st.sidebar.radio("Navegação", ["🛍️ Ver Ofertas", "➕ Anunciar Agora", "🗂️ Meus Anúncios", "💬 Chat Interno"])
@@ -110,11 +125,10 @@ menu = st.sidebar.radio("Navegação", ["🛍️ Ver Ofertas", "➕ Anunciar Ago
 if menu == "💬 Chat Interno":
     if not esta_logado: 
         st.warning("⚠️ Faça login para ver suas mensagens.")
-    else:
+    elif db:
         st.subheader("💬 Minhas Mensagens")
         email_atual = st.session_state['usuario']['email']
         try:
-            # Busca mensagens onde o usuário participa
             msgs = db.collection("mensagens").where("participantes", "array_contains", email_atual).stream()
             cont_msg = 0
             for m in msgs:
@@ -130,7 +144,7 @@ if menu == "💬 Chat Interno":
 elif menu == "➕ Anunciar Agora":
     if not esta_logado: 
         st.warning("⚠️ Faça login para anunciar.")
-    else:
+    elif db:
         st.subheader("📢 Criar Novo Anúncio")
         with st.form("form_venda_vrs", clear_on_submit=True):
             nome = st.text_input("Título do Produto")
@@ -166,7 +180,7 @@ elif menu == "➕ Anunciar Agora":
 elif menu == "🗂️ Meus Anúncios":
     if not esta_logado: 
         st.warning("⚠️ Faça login para gerenciar seus anúncios.")
-    else:
+    elif db:
         try:
             docs = db.collection("anuncios").where("email_dono", "==", st.session_state['usuario']['email']).stream()
             for doc in docs:
@@ -185,69 +199,72 @@ elif menu == "🗂️ Meus Anúncios":
 
 # --- ABA: VITRINE ---
 elif menu == "🛍️ Ver Ofertas":
-    c_f1, c_f2 = st.columns(2)
-    with c_f1: filtro_cat = st.selectbox("📂 Categorias", lista_cats)
-    with c_f2: filtro_uf = st.selectbox("📍 Estado", lista_filtro_ufs)
-    busca = st.text_input("🔍 O que você procura?")
-    
-    if 'detalhe_id' in st.session_state:
-        # VISUALIZAÇÃO DETALHADA DO PRODUTO
-        doc = db.collection("anuncios").document(st.session_state.detalhe_id).get()
-        if doc.exists:
-            it = doc.to_dict()
-            if st.button("⬅️ Voltar"):
-                del st.session_state.detalhe_id
-                st.rerun()
-            
-            c_th, c_img = st.columns([0.5, 3])
-            gal = it.get('fotos', ['https://via.placeholder.com/400'])
-            if 'foto_index' not in st.session_state: st.session_state.foto_index = 0
-            with c_th:
-                for idx, lk in enumerate(gal):
-                    if st.button(f"📸 {idx+1}", key=f"b_{idx}", use_container_width=True):
-                        st.session_state.foto_index = idx
-                        st.rerun()
-            with c_img: 
-                st.markdown(f"<div class='main-photo-container'><img src='{gal[st.session_state.foto_index]}'></div>", unsafe_allow_html=True)
+    if db:
+        c_f1, c_f2 = st.columns(2)
+        with c_f1: filtro_cat = st.selectbox("📂 Categorias", lista_cats)
+        with c_f2: filtro_uf = st.selectbox("📍 Estado", lista_filtro_ufs)
+        busca = st.text_input("🔍 O que você procura?")
+        
+        if 'detalhe_id' in st.session_state:
+            # VISUALIZAÇÃO DETALHADA
+            doc = db.collection("anuncios").document(st.session_state.detalhe_id).get()
+            if doc.exists:
+                it = doc.to_dict()
+                if st.button("⬅️ Voltar"):
+                    del st.session_state.detalhe_id
+                    st.rerun()
+                
+                c_th, c_img = st.columns([0.5, 3])
+                gal = it.get('fotos', ['https://via.placeholder.com/400'])
+                if 'foto_index' not in st.session_state: st.session_state.foto_index = 0
+                with c_th:
+                    for idx, lk in enumerate(gal):
+                        if st.button(f"📸 {idx+1}", key=f"b_{idx}", use_container_width=True):
+                            st.session_state.foto_index = idx
+                            st.rerun()
+                with c_img: 
+                    st.markdown(f"<div class='main-photo-container'><img src='{gal[st.session_state.foto_index]}'></div>", unsafe_allow_html=True)
 
-            st.title(it['nome'])
-            st.header(f"R$ {it['valor']:,.2f}")
-            st.write(f"📍 {it.get('local', '')} - {it.get('estado', '')}")
-            st.write(f"👤 Vendedor: {it.get('nome_dono', 'VRS Usuário')}")
-            st.info(it.get('desc', 'Sem descrição.'))
-            
-            pode_ver_zap = usuarios_vrs.verificar_privacidade(it['email_dono'], db)
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("💬 ENVIAR MENSAGEM", use_container_width=True):
-                    if not esta_logado: st.error("Logue primeiro!")
-                    else: st.success("Função de chat em breve!")
-            with c2:
-                if pode_ver_zap: 
-                    st.success(f"📱 WhatsApp: {it.get('zap')}")
-                else: 
-                    st.info("🔒 Vendedor atende apenas pelo Chat.")
+                st.title(it['nome'])
+                st.header(f"R$ {it['valor']:,.2f}")
+                st.write(f"📍 {it.get('local', '')} - {it.get('estado', '')}")
+                st.write(f"👤 Vendedor: {it.get('nome_dono', 'VRS Usuário')}")
+                st.info(it.get('desc', 'Sem descrição.'))
+                
+                pode_ver_zap = usuarios_vrs.verificar_privacidade(it['email_dono'], db)
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("💬 ENVIAR MENSAGEM", use_container_width=True):
+                        if not esta_logado: st.error("Logue primeiro!")
+                        else: st.success("Função de chat em breve!")
+                with c2:
+                    if pode_ver_zap: 
+                        st.success(f"📱 WhatsApp: {it.get('zap')}")
+                    else: 
+                        st.info("🔒 Vendedor atende apenas pelo Chat.")
+        else:
+            # LISTAGEM
+            try:
+                query = db.collection("anuncios").where("status", "==", "ativo")
+                query = categorias.filtrar_por_categoria(query, filtro_cat)
+                if filtro_uf != "Todos": 
+                    query = query.where("estado", "==", filtro_uf)
+                
+                resultados = [doc for doc in query.stream() if busca.lower() in doc.to_dict().get('nome', '').lower()]
+                if not resultados:
+                    st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Nada encontrado.</h3>", unsafe_allow_html=True)
+                else:
+                    for doc in resultados:
+                        it = doc.to_dict()
+                        foto_v = it.get('fotos', ['https://via.placeholder.com/200'])[0]
+                        st.markdown(f"<div class='olx-card'><img src='{foto_v}' class='olx-img-thumb'><div class='olx-info'><b>{it['nome']}</b><br>R$ {it['valor']:,.2f}<br><small>{it.get('local', '')} - {it.get('estado', '')}</small></div></div>", unsafe_allow_html=True)
+                        if st.button("Detalhes", key=f"det_{doc.id}"):
+                            st.session_state.detalhe_id = doc.id
+                            st.rerun()
+            except Exception: 
+                st.info("Carregando vitrine...")
     else:
-        # LISTAGEM DE CARDS
-        try:
-            query = db.collection("anuncios").where("status", "==", "ativo")
-            query = categorias.filtrar_por_categoria(query, filtro_cat)
-            if filtro_uf != "Todos": 
-                query = query.where("estado", "==", filtro_uf)
-            
-            resultados = [doc for doc in query.stream() if busca.lower() in doc.to_dict().get('nome', '').lower()]
-            if not resultados:
-                st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Nada encontrado.</h3>", unsafe_allow_html=True)
-            else:
-                for doc in resultados:
-                    it = doc.to_dict()
-                    foto_v = it.get('fotos', ['https://via.placeholder.com/200'])[0]
-                    st.markdown(f"<div class='olx-card'><img src='{foto_v}' class='olx-img-thumb'><div class='olx-info'><b>{it['nome']}</b><br>R$ {it['valor']:,.2f}<br><small>{it.get('local', '')} - {it.get('estado', '')}</small></div></div>", unsafe_allow_html=True)
-                    if st.button("Detalhes", key=f"det_{doc.id}"):
-                        st.session_state.detalhe_id = doc.id
-                        st.rerun()
-        except Exception: 
-            st.info("Carregando vitrine...")
+        st.error("Sistema de vitrine indisponível por erro de conexão.")
 
 # --- RODAPÉ ---
 st.markdown("<div class='footer-vrs'><p>🛡️ Segurança VRS: Nunca pague antes de ver o produto!</p></div>", unsafe_allow_html=True)
