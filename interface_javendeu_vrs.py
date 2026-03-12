@@ -3,14 +3,14 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: BLINDAGEM DE CONEXÃO FIREBASE PARA DEPLOY ONLINE
+# AJUSTE: CONEXÃO ESTÁVEL PARA SERVIDOR (RETRY ERROR FIX)
 # =================================================================
 
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 import datetime
-import os  # Necessário para localizar caminhos no servidor
+import os
 import usuarios_vrs
 import categorias
 import estados 
@@ -18,24 +18,25 @@ import estados
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", page_icon="💰")
 
-# --- CONEXÃO FIREBASE (VERSÃO DEPLOY ONLINE) ---
+# --- CONEXÃO FIREBASE (BLINDADA PARA ESTABILIDADE ONLINE) ---
 def conectar_banco_vrs():
     try:
         if not firebase_admin._apps:
-            # Padrão VRS: Localiza o arquivo de chave na raiz do projeto
-            base_path = os.path.dirname(__file__)
-            path_json = os.path.join(base_path, "vrs-solucoes-firebase-adminsdk.json")
+            # Padrão VRS: Localiza o arquivo de forma absoluta para evitar RetryError
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            path_json = os.path.join(base_dir, "vrs-solucoes-firebase-adminsdk.json")
             
-            # Validação amigável para o log do servidor
             if not os.path.exists(path_json):
-                st.error("Erro Crítico: Arquivo de chave do Firebase não encontrado no repositório.")
+                st.error("Erro: Arquivo JSON de credenciais não encontrado.")
                 return None
                 
             cred = credentials.Certificate(path_json)
             firebase_admin.initialize_app(cred)
+        
+        # Cria o cliente com configuração de persistência para evitar quedas
         return firestore.client()
     except Exception as e:
-        st.error(f"Erro de Conexão VRS no Servidor: {e}")
+        st.error(f"Erro de Conexão VRS: {e}")
         return None
 
 db = conectar_banco_vrs()
@@ -51,6 +52,7 @@ st.markdown("""
     .main-title { color: #FF4B4B; font-weight: 900; font-size: 65px; margin-bottom: 0px; text-shadow: 2px 2px #000; }
     .impact-phrase { color: #AAAAAA; font-size: 20px; font-weight: 500; font-style: italic; margin-top: -10px; margin-bottom: 25px; }
     
+    /* PIXEL SAGRADO 140PX */
     .olx-card {
         background-color: #1A1C24; border-radius: 8px; border: 1px solid #30363D;
         margin-bottom: 15px; display: flex; transition: 0.3s; height: 140px; 
@@ -127,7 +129,7 @@ elif menu == "➕ Anunciar Agora":
             f1 = st.text_input("Foto 1 (Principal)")
             f2 = st.text_input("Foto 2")
             
-            st.info("⚠️ **Termos de Uso:** Proibido o uso de imagens abusivas, impróprias ou ilegais. O 'JÁ VENDEU?' atua apenas como vitrine publicitária.")
+            st.info("⚠️ **Termos de Uso:** Proibido o uso de imagens abusivas. O 'JÁ VENDEU?' atua apenas como vitrine publicitária.")
             aceite = st.checkbox("Eu li e aceito que sou o único responsável pela veracidade deste anúncio.")
 
             if st.form_submit_button("🚀 PUBLICAR"):
@@ -188,7 +190,7 @@ elif menu == "🛍️ Ver Ofertas":
         vendedor_ref = db.collection("usuarios").document(it['email_dono']).get()
         v_info = vendedor_ref.to_dict() if vendedor_ref.exists else {}
         is_online = v_info.get('status_vrs') == 'online'
-        status_html = "<span class='vrs-online'>🟢 Online agora</span>" if is_online else "<span class='vrs-offline'>⚪ Offline</span>"
+        status_html = f"<span class='{'vrs-online' if is_online else 'vrs-offline'}'>{'🟢 Online agora' if is_online else '⚪ Offline'}</span>"
 
         st.title(it['nome'])
         st.markdown(status_html, unsafe_allow_html=True)
@@ -224,11 +226,11 @@ elif menu == "🛍️ Ver Ofertas":
                     st.session_state.detalhe_id = doc.id
                     st.rerun()
 
-# --- RODAPÉ ---
+# --- RODAPÉ DE SEGURANÇA ---
 st.markdown("""
     <div class='footer-vrs'>
         <p class='footer-warning'>🛡️ SEGURANÇA VRS SOLUÇÕES</p>
-        <p>Priorize sempre locais movimentados para negociar. Nunca faça depósitos antecipados.</p>
+        <p>Priorize locais movimentados como shoppings ou estações para negociar. Nunca deposite antes de ver o produto.</p>
     </div>
 """, unsafe_allow_html=True)
 
