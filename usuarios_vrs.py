@@ -3,7 +3,7 @@
 # JÁ VENDEU? - GESTÃO DE USUÁRIOS E PRIVACIDADE
 # MÓDULO: usuarios_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: CORREÇÃO DE VISUAL ENCAVALADO E BLINDAGEM DE CADASTRO
+# AJUSTE: OTIMIZAÇÃO DE VELOCIDADE E CORREÇÃO DE VISUAL ENCAVALADO
 # =================================================================
 
 import streamlit as st
@@ -22,12 +22,15 @@ def gerenciar_acesso(db):
     if not st.session_state['logado']:
         with st.popover("👤 Minha Conta"):
             st.markdown("<span style='color: #888888;'>● Offline</span>", unsafe_allow_html=True)
-            aba = st.tabs(["Entrar", "Criar Conta"])
             
-            with aba[0]:
-                e = st.text_input("E-mail", key="vrs_e_login")
-                s = st.text_input("Senha", type="password", key="vrs_s_login")
-                if st.button("LOGAR", use_container_width=True):
+            # Seletor direto para evitar carregamento duplo e lentidão
+            modo = st.radio("Acesso", ["Entrar", "Criar Conta"], horizontal=True, label_visibility="collapsed")
+            st.markdown("---")
+
+            if modo == "Entrar":
+                e = st.text_input("E-mail", key="login_email")
+                s = st.text_input("Senha", type="password", key="login_senha")
+                if st.button("LOGAR AGORA", use_container_width=True):
                     try:
                         res = db.collection("usuarios").document(e).get()
                         if res.exists and res.to_dict()['senha'] == criar_hash(s):
@@ -37,20 +40,20 @@ def gerenciar_acesso(db):
                                 "status_vrs": "online", "ultima_atividade": datetime.datetime.now()
                             })
                             st.rerun()
-                        else: st.error("E-mail ou senha incorretos!")
+                        else: st.error("Dados incorretos!")
                     except: st.error("Erro de conexão. Tente novamente.")
             
-            with aba[1]:
-                n = st.text_input("Nome completo", key="reg_n")
-                em = st.text_input("E-mail de acesso", key="reg_e")
-                z = st.text_input("WhatsApp (com DDD)", key="reg_z")
-                se = st.text_input("Crie uma senha", type="password", key="reg_s")
+            else:
+                n = st.text_input("Nome completo", key="reg_nome")
+                em = st.text_input("E-mail de acesso", key="reg_email")
+                z = st.text_input("WhatsApp (com DDD)", key="reg_zap")
+                se = st.text_input("Crie uma senha", type="password", key="reg_senha")
                 p_zap = st.checkbox("Exibir WhatsApp nos anúncios?", value=False)
                 
                 if st.button("FINALIZAR CADASTRO", use_container_width=True):
                     if n and em and z and se:
                         sucesso = False
-                        # Tenta gravar 3 vezes para evitar o Retry Error do servidor
+                        # Tenta gravar 3 vezes para blindar contra Retry Error
                         for tentativa in range(3):
                             try:
                                 db.collection("usuarios").document(em).set({
@@ -64,10 +67,10 @@ def gerenciar_acesso(db):
                                 time.sleep(1)
                         
                         if sucesso:
-                            st.success("Conta criada! Vá na aba 'Entrar'.")
+                            st.success("Conta criada! Mude para 'Entrar'.")
                         else:
-                            st.error("Servidor instável. Tente novamente.")
-                    else: st.warning("Preencha todos os campos!")
+                            st.error("Servidor ocupado. Tente de novo.")
+                    else: st.warning("Preencha tudo!")
     else:
         p_nome = st.session_state['usuario']['nome'].split()[0]
         with st.popover(f"✅ {p_nome}"):

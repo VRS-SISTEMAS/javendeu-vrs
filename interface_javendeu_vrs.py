@@ -18,7 +18,7 @@ import estados
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", page_icon="💰")
 
-# --- CONEXÃO FIREBASE (BLINDADA) ---
+# --- CONEXÃO FIREBASE (BLINDADA COM CACHE) ---
 @st.cache_resource
 def conectar_banco_vrs():
     try:
@@ -48,6 +48,7 @@ st.markdown("""
     .main-title { color: #FF4B4B; font-weight: 900; font-size: 65px; margin-bottom: 0px; text-shadow: 2px 2px #000; }
     .impact-phrase { color: #AAAAAA; font-size: 20px; font-weight: 500; font-style: italic; margin-top: -10px; margin-bottom: 25px; }
     
+    /* PIXEL SAGRADO 140PX */
     .olx-card {
         background-color: #1A1C24; border-radius: 8px; border: 1px solid #30363D;
         margin-bottom: 15px; display: flex; transition: 0.3s; height: 140px; 
@@ -69,7 +70,6 @@ st.markdown("""
     .vrs-online { color: #00FF00; font-weight: bold; font-size: 14px; }
     .vrs-offline { color: #888888; font-weight: bold; font-size: 14px; }
     .footer-vrs { background-color: #1A1C24; padding: 20px; border-radius: 10px; border-top: 3px solid #FF4B4B; margin-top: 50px; text-align: center; }
-    .footer-warning { color: #FF4B4B; font-weight: bold; font-size: 16px; }
     .watermark { position: fixed; bottom: 10px; right: 15px; font-size: 10px; color: #444; z-index: 100; }
     </style>
     <div class="watermark">VRS Soluções</div>
@@ -80,7 +80,7 @@ header_col1, header_col2, header_col3 = st.columns([1, 2, 1])
 with header_col2:
     st.markdown("<div class='logo-container'><h1 class='main-title'>JÁ VENDEU?</h1><p class='impact-phrase'>Anuncie agora e transforme desapego em lucro rápido!</p></div>", unsafe_allow_html=True)
 with header_col3:
-    st.markdown("<div style='margin-top: 50px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
     esta_logado = usuarios_vrs.gerenciar_acesso(db)
 
 st.markdown("---")
@@ -144,18 +144,20 @@ elif menu == "➕ Anunciar Agora":
 elif menu == "🗂️ Meus Anúncios":
     if not esta_logado: st.warning("⚠️ Faça login.")
     else:
-        docs = db.collection("anuncios").where("email_dono", "==", st.session_state['usuario']['email']).stream()
-        for doc in docs:
-            it = doc.to_dict()
-            foto_c = it.get('fotos', [it.get('foto', 'https://via.placeholder.com/150')])[0]
-            col_inf, col_btn = st.columns([4, 1.5])
-            with col_inf:
-                st.markdown(f"<div class='olx-card'><img src='{foto_c}' class='olx-img-thumb'><div class='olx-info'><b>{it['nome']}</b></div></div>", unsafe_allow_html=True)
-            with col_btn:
-                st.write("<br>")
-                if st.button("🗑️ EXCLUIR", key=f"d_{doc.id}", use_container_width=True):
-                    db.collection("anuncios").document(doc.id).delete()
-                    st.rerun()
+        try:
+            docs = db.collection("anuncios").where("email_dono", "==", st.session_state['usuario']['email']).stream()
+            for doc in docs:
+                it = doc.to_dict()
+                foto_c = it.get('fotos', [it.get('foto', 'https://via.placeholder.com/150')])[0]
+                col_inf, col_btn = st.columns([4, 1.5])
+                with col_inf:
+                    st.markdown(f"<div class='olx-card'><img src='{foto_c}' class='olx-img-thumb'><div class='olx-info'><b>{it['nome']}</b></div></div>", unsafe_allow_html=True)
+                with col_btn:
+                    st.write("<br>")
+                    if st.button("🗑️ EXCLUIR", key=f"d_{doc.id}", use_container_width=True):
+                        db.collection("anuncios").document(doc.id).delete()
+                        st.rerun()
+        except: st.info("Buscando anúncios...")
 
 # --- ABA: VITRINE ---
 elif menu == "🛍️ Ver Ofertas":
@@ -203,26 +205,28 @@ elif menu == "🛍️ Ver Ofertas":
             if pode_ver_zap: st.success(f"📱 WhatsApp: {it.get('zap')}")
             else: st.info("🔒 Vendedor atende apenas pelo Chat.")
     else:
-        query = db.collection("anuncios").where("status", "==", "ativo")
-        query = categorias.filtrar_por_categoria(query, filtro_cat)
-        if filtro_uf != "Todos": query = query.where("estado", "==", filtro_uf)
-        
-        resultados = [doc for doc in query.stream() if busca.lower() in doc.to_dict().get('nome', '').lower()]
-        if not resultados:
-            st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Busca não encontrada.</h3>", unsafe_allow_html=True)
-        else:
-            for doc in resultados:
-                it = doc.to_dict()
-                foto_v = it.get('fotos', [it.get('foto', 'https://via.placeholder.com/200')])[0]
-                st.markdown(f"<div class='olx-card'><img src='{foto_v}' class='olx-img-thumb'><div class='olx-info'><b>{it['nome']}</b><br>R$ {it['valor']:,.2f}<br><small>{it.get('local', '')} - {it.get('estado', '')}</small></div></div>", unsafe_allow_html=True)
-                if st.button("Detalhes", key=f"det_{doc.id}"):
-                    st.session_state.detalhe_id = doc.id
-                    st.rerun()
+        try:
+            query = db.collection("anuncios").where("status", "==", "ativo")
+            query = categorias.filtrar_por_categoria(query, filtro_cat)
+            if filtro_uf != "Todos": query = query.where("estado", "==", filtro_uf)
+            
+            resultados = [doc for doc in query.stream() if busca.lower() in doc.to_dict().get('nome', '').lower()]
+            if not resultados:
+                st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Busca não encontrada.</h3>", unsafe_allow_html=True)
+            else:
+                for doc in resultados:
+                    it = doc.to_dict()
+                    foto_v = it.get('fotos', [it.get('foto', 'https://via.placeholder.com/200')])[0]
+                    st.markdown(f"<div class='olx-card'><img src='{foto_v}' class='olx-img-thumb'><div class='olx-info'><b>{it['nome']}</b><br>R$ {it['valor']:,.2f}<br><small>{it.get('local', '')} - {it.get('estado', '')}</small></div></div>", unsafe_allow_html=True)
+                    if st.button("Detalhes", key=f"det_{doc.id}"):
+                        st.session_state.detalhe_id = doc.id
+                        st.rerun()
+        except: st.info("Carregando...")
 
 # --- RODAPÉ DE SEGURANÇA ---
 st.markdown("""
     <div class='footer-vrs'>
-        <p class='footer-warning'>🛡️ SEGURANÇA VRS SOLUÇÕES</p>
+        <p style='color: #FF4B4B; font-weight: bold;'>🛡️ SEGURANÇA VRS SOLUÇÕES</p>
         <p>Priorize locais movimentados como shoppings ou estações para negociar. Nunca deposite antes de ver o produto.</p>
     </div>
 """, unsafe_allow_html=True)
