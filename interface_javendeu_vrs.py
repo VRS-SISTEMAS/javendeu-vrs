@@ -3,7 +3,7 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: CONEXÃO PERSISTENTE E CORREÇÃO VISUAL DO LOGIN
+# AJUSTE: CONEXÃO SEGURA VIA STREAMLIT SECRETS (FIM DO ERRO JWT)
 # =================================================================
 
 import streamlit as st
@@ -18,21 +18,33 @@ import estados
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", page_icon="💰")
 
-# --- CONEXÃO FIREBASE (BLINDADA COM CACHE) ---
+# --- CONEXÃO FIREBASE (BLINDADA VIA SECRETS - PADRÃO VRS) ---
 @st.cache_resource
 def conectar_banco_vrs():
     try:
         if not firebase_admin._apps:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            path_json = os.path.join(base_dir, "vrs-solucoes-firebase-adminsdk.json")
-            if not os.path.exists(path_json):
-                st.error("Chave JSON não encontrada.")
-                return None
-            cred = credentials.Certificate(path_json)
-            firebase_admin.initialize_app(cred)
+            # Tenta ler do Secrets (Cofre do Streamlit) para evitar erro de assinatura JWT
+            if "textkey" in st.secrets:
+                cred_dict = dict(st.secrets["textkey"])
+                # Corrige quebras de linha na chave privada se necessário
+                if "\\n" in cred_dict["private_key"]:
+                    cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
+                
+                cred = credentials.Certificate(cred_dict)
+                firebase_admin.initialize_app(cred)
+            else:
+                # Fallback para modo local (procura o arquivo se não houver secrets)
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                path_json = os.path.join(base_dir, "vrs-solucoes-firebase-adminsdk.json")
+                if os.path.exists(path_json):
+                    cred = credentials.Certificate(path_json)
+                    firebase_admin.initialize_app(cred)
+                else:
+                    st.error("Erro Crítico: Chave JSON ou Secrets não encontrados.")
+                    return None
         return firestore.client()
     except Exception as e:
-        st.error(f"Erro de Conexão: {e}")
+        st.error(f"Erro de Conexão Segura VRS: {e}")
         return None
 
 db = conectar_banco_vrs()
