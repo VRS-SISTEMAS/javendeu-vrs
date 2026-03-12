@@ -3,7 +3,7 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: RECONHECIMENTO AUTOMÁTICO DE CHAVE RSA (FIX SECRETS)
+# AJUSTE: BLINDAGEM DE CONEXÃO E CORREÇÃO DE REDIRECIONAMENTO SECRETS
 # =================================================================
 
 import streamlit as st
@@ -21,32 +21,36 @@ st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", pa
 # --- CONEXÃO FIREBASE (BLINDAGEM TOTAL VRS) ---
 @st.cache_resource
 def conectar_banco_vrs():
-    """Conecta ao Firebase limpando a chave privada enviada pelo Vitor."""
+    """Realiza a conexão segura com o Firestore da VRS Soluções com limpeza bruta de chaves."""
     try:
         if not firebase_admin._apps:
             # 1. TENTA VIA SECRETS (MODO PRODUÇÃO)
             if "textkey" in st.secrets:
-                # Transforma o objeto do Streamlit em um dicionário comum
-                cred_dict = dict(st.secrets["textkey"])
+                # Criamos um dicionário limpo para evitar erros de leitura do TOML
+                cred_dict = {}
+                for chave in ["type", "project_id", "private_key_id", "private_key", 
+                             "client_email", "client_id", "auth_uri", "token_uri", 
+                             "auth_provider_x509_cert_url", "client_x509_cert_url"]:
+                    if chave in st.secrets["textkey"]:
+                        cred_dict[chave] = st.secrets["textkey"][chave]
                 
-                # TRATAMENTO ESPECIAL PARA A CHAVE DO VITOR
+                # LIMPEZA PROFISSIONAL DA PRIVATE KEY (Onde o erro costuma estar)
                 if "private_key" in cred_dict:
                     pk = cred_dict["private_key"]
+                    # Remove quebras de linha literais escritas como texto
+                    pk = pk.replace("\\n", "\n")
+                    # Remove aspas que o usuário pode ter colado junto
+                    pk = pk.strip().strip('"').strip("'")
+                    # Garante os delimitadores PEM corretos
+                    if "-----BEGIN PRIVATE KEY-----" not in pk:
+                        pk = "-----BEGIN PRIVATE KEY-----\n" + pk
+                    if "-----END PRIVATE KEY-----" not in pk:
+                        pk = pk + "\n-----END PRIVATE KEY-----"
                     
-                    # 1. Limpa espaços e aspas extras
-                    pk = pk.strip().strip("'").strip('"')
-                    
-                    # 2. Se a chave veio como uma linha só com \n em texto, converte para quebra real
-                    if "\\n" in pk:
-                        pk = pk.replace("\\n", "\n")
-                    
-                    # 3. Garante que as quebras de linha da chave RSA sejam respeitadas
-                    # (Importante para chaves copiadas direto do JSON)
                     cred_dict["private_key"] = pk
                 
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
-                return firestore.client()
             
             # 2. TENTA VIA ARQUIVO (MODO LOCAL)
             else:
@@ -55,14 +59,13 @@ def conectar_banco_vrs():
                 if os.path.exists(path_json):
                     cred = credentials.Certificate(path_json)
                     firebase_admin.initialize_app(cred)
-                    return firestore.client()
                 else:
-                    st.error("⚠️ VRS Soluções: Credenciais não encontradas. Verifique o painel Secrets.")
+                    # Se cair aqui, o Streamlit vai mostrar o link do navegador de Secrets
+                    st.error("⚠️ VRS Soluções: Credenciais não encontradas nos Secrets ou no arquivo JSON.")
                     return None
                     
         return firestore.client()
     except Exception as e:
-        # Se der erro, mostra o erro técnico para sabermos o que é
         st.error(f"❌ Erro de Autenticação VRS: {e}")
         return None
 
@@ -113,6 +116,7 @@ with header_col3:
         esta_logado = usuarios_vrs.gerenciar_acesso(db)
     else:
         esta_logado = False
+        st.warning("Banco de Dados Offline.")
 
 st.markdown("---")
 menu = st.sidebar.radio("Navegação", ["🛍️ Ver Ofertas", "➕ Anunciar Agora", "🗂️ Meus Anúncios", "💬 Chat Interno"])
@@ -202,6 +206,7 @@ elif menu == "🛍️ Ver Ofertas":
         busca = st.text_input("🔍 O que você procura?")
         
         if 'detalhe_id' in st.session_state:
+            # VISUALIZAÇÃO DETALHADA
             doc = db.collection("anuncios").document(st.session_state.detalhe_id).get()
             if doc.exists:
                 it = doc.to_dict()
@@ -238,6 +243,7 @@ elif menu == "🛍️ Ver Ofertas":
                     else: 
                         st.info("🔒 Vendedor atende apenas pelo Chat.")
         else:
+            # LISTAGEM
             try:
                 query = db.collection("anuncios").where("status", "==", "ativo")
                 query = categorias.filtrar_por_categoria(query, filtro_cat)
@@ -256,9 +262,9 @@ elif menu == "🛍️ Ver Ofertas":
                             st.session_state.detalhe_id = doc.id
                             st.rerun()
             except Exception: 
-                st.info("Buscando ofertas...")
+                st.info("Carregando vitrine...")
     else:
-        st.error("Aguardando conexão com o banco de dados...")
+        st.error("Sistema de vitrine indisponível por erro de conexão.")
 
 # --- RODAPÉ ---
 st.markdown("<div class='footer-vrs'><p>🛡️ Segurança VRS: Nunca pague antes de ver o produto!</p></div>", unsafe_allow_html=True)
