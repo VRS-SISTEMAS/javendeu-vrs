@@ -3,7 +3,7 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: CONEXÃO ESTÁVEL PARA SERVIDOR (RETRY ERROR FIX)
+# AJUSTE: CONEXÃO PERSISTENTE E CORREÇÃO VISUAL DO LOGIN
 # =================================================================
 
 import streamlit as st
@@ -18,25 +18,21 @@ import estados
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", page_icon="💰")
 
-# --- CONEXÃO FIREBASE (BLINDADA PARA ESTABILIDADE ONLINE) ---
+# --- CONEXÃO FIREBASE (BLINDADA) ---
+@st.cache_resource
 def conectar_banco_vrs():
     try:
         if not firebase_admin._apps:
-            # Padrão VRS: Localiza o arquivo de forma absoluta para evitar RetryError
             base_dir = os.path.dirname(os.path.abspath(__file__))
             path_json = os.path.join(base_dir, "vrs-solucoes-firebase-adminsdk.json")
-            
             if not os.path.exists(path_json):
-                st.error("Erro: Arquivo JSON de credenciais não encontrado.")
+                st.error("Chave JSON não encontrada.")
                 return None
-                
             cred = credentials.Certificate(path_json)
             firebase_admin.initialize_app(cred)
-        
-        # Cria o cliente com configuração de persistência para evitar quedas
         return firestore.client()
     except Exception as e:
-        st.error(f"Erro de Conexão VRS: {e}")
+        st.error(f"Erro de Conexão: {e}")
         return None
 
 db = conectar_banco_vrs()
@@ -52,7 +48,6 @@ st.markdown("""
     .main-title { color: #FF4B4B; font-weight: 900; font-size: 65px; margin-bottom: 0px; text-shadow: 2px 2px #000; }
     .impact-phrase { color: #AAAAAA; font-size: 20px; font-weight: 500; font-style: italic; margin-top: -10px; margin-bottom: 25px; }
     
-    /* PIXEL SAGRADO 140PX */
     .olx-card {
         background-color: #1A1C24; border-radius: 8px; border: 1px solid #30363D;
         margin-bottom: 15px; display: flex; transition: 0.3s; height: 140px; 
@@ -73,10 +68,8 @@ st.markdown("""
     
     .vrs-online { color: #00FF00; font-weight: bold; font-size: 14px; }
     .vrs-offline { color: #888888; font-weight: bold; font-size: 14px; }
-
     .footer-vrs { background-color: #1A1C24; padding: 20px; border-radius: 10px; border-top: 3px solid #FF4B4B; margin-top: 50px; text-align: center; }
     .footer-warning { color: #FF4B4B; font-weight: bold; font-size: 16px; }
-
     .watermark { position: fixed; bottom: 10px; right: 15px; font-size: 10px; color: #444; z-index: 100; }
     </style>
     <div class="watermark">VRS Soluções</div>
@@ -105,10 +98,12 @@ if menu == "💬 Chat Interno":
                 d = m.to_dict()
                 st.markdown(f"<div class='msg-caixa'><b>{d['remetente_nome']}</b> sobre <i>{d['anuncio_nome']}</i>:<br>{d['texto']}</div>", unsafe_allow_html=True)
         except:
-            msgs = db.collection("mensagens").where("participantes", "array_contains", email_atual).stream()
-            for m in msgs:
-                d = m.to_dict()
-                st.markdown(f"<div class='msg-caixa'><b>{d['remetente_nome']}</b>: {d['texto']}</div>", unsafe_allow_html=True)
+            try:
+                msgs = db.collection("mensagens").where("participantes", "array_contains", email_atual).stream()
+                for m in msgs:
+                    d = m.to_dict()
+                    st.markdown(f"<div class='msg-caixa'><b>{d['remetente_nome']}</b>: {d['texto']}</div>", unsafe_allow_html=True)
+            except: st.error("Erro ao carregar mensagens.")
 
 # --- ABA: ANUNCIAR ---
 elif menu == "➕ Anunciar Agora":
@@ -123,28 +118,27 @@ elif menu == "➕ Anunciar Agora":
             with c1: uf = st.selectbox("UF", lista_ufs, index=lista_ufs.index("RJ"))
             with c2: cid = st.text_input("Cidade / Bairro")
             with c3: preco = st.number_input("Preço (R$)", min_value=0.0)
-            
             whatsapp = st.text_input("WhatsApp", value=st.session_state['usuario']['zap'])
             st.write("🖼️ **Links das Fotos**")
             f1 = st.text_input("Foto 1 (Principal)")
             f2 = st.text_input("Foto 2")
-            
             st.info("⚠️ **Termos de Uso:** Proibido o uso de imagens abusivas. O 'JÁ VENDEU?' atua apenas como vitrine publicitária.")
             aceite = st.checkbox("Eu li e aceito que sou o único responsável pela veracidade deste anúncio.")
 
             if st.form_submit_button("🚀 PUBLICAR"):
                 if aceite and nome and preco > 0 and f1:
-                    db.collection("anuncios").add({
-                        "nome": nome, "categoria": cat, "valor": preco, "zap": whatsapp,
-                        "estado": uf, "local": cid, "desc": desc, "fotos": [f for f in [f1, f2] if f],
-                        "data": datetime.datetime.now(), "status": "ativo",
-                        "email_dono": st.session_state['usuario']['email'],
-                        "nome_dono": st.session_state['usuario']['nome']
-                    })
-                    st.success("Anunciado com sucesso!")
-                    st.rerun()
-                elif not aceite:
-                    st.error("Você precisa aceitar os termos para publicar.")
+                    try:
+                        db.collection("anuncios").add({
+                            "nome": nome, "categoria": cat, "valor": preco, "zap": whatsapp,
+                            "estado": uf, "local": cid, "desc": desc, "fotos": [f for f in [f1, f2] if f],
+                            "data": datetime.datetime.now(), "status": "ativo",
+                            "email_dono": st.session_state['usuario']['email'],
+                            "nome_dono": st.session_state['usuario']['nome']
+                        })
+                        st.success("Anunciado com sucesso!")
+                        st.rerun()
+                    except: st.error("Erro ao publicar.")
+                elif not aceite: st.error("Aceite os termos.")
 
 # --- ABA: MEUS ANÚNCIOS ---
 elif menu == "🗂️ Meus Anúncios":
@@ -176,7 +170,6 @@ elif menu == "🛍️ Ver Ofertas":
         if st.button("⬅️ Voltar"):
             del st.session_state.detalhe_id
             st.rerun()
-        
         c_th, c_img = st.columns([0.5, 3])
         gal = it.get('fotos', [it.get('foto', 'https://via.placeholder.com/400')])
         if 'foto_index' not in st.session_state: st.session_state.foto_index = 0
@@ -187,10 +180,12 @@ elif menu == "🛍️ Ver Ofertas":
                     st.rerun()
         with c_img: st.markdown(f"<div class='main-photo-container'><img src='{gal[st.session_state.foto_index]}'></div>", unsafe_allow_html=True)
 
-        vendedor_ref = db.collection("usuarios").document(it['email_dono']).get()
-        v_info = vendedor_ref.to_dict() if vendedor_ref.exists else {}
-        is_online = v_info.get('status_vrs') == 'online'
-        status_html = f"<span class='{'vrs-online' if is_online else 'vrs-offline'}'>{'🟢 Online agora' if is_online else '⚪ Offline'}</span>"
+        try:
+            vendedor_ref = db.collection("usuarios").document(it['email_dono']).get()
+            v_info = vendedor_ref.to_dict() if vendedor_ref.exists else {}
+            is_online = v_info.get('status_vrs') == 'online'
+            status_html = f"<span class='{'vrs-online' if is_online else 'vrs-offline'}'>{'🟢 Online agora' if is_online else '⚪ Offline'}</span>"
+        except: status_html = ""
 
         st.title(it['nome'])
         st.markdown(status_html, unsafe_allow_html=True)
@@ -198,7 +193,6 @@ elif menu == "🛍️ Ver Ofertas":
         st.write(f"📍 {it.get('local', '')} - {it.get('estado', '')}")
         st.write(f"👤 Vendedor: {it.get('nome_dono', 'Não informado')}")
         st.write(it['desc'])
-        
         pode_ver_zap = usuarios_vrs.verificar_privacidade(it['email_dono'], db)
         c1, c2 = st.columns(2)
         with c1:
@@ -214,7 +208,6 @@ elif menu == "🛍️ Ver Ofertas":
         if filtro_uf != "Todos": query = query.where("estado", "==", filtro_uf)
         
         resultados = [doc for doc in query.stream() if busca.lower() in doc.to_dict().get('nome', '').lower()]
-        
         if not resultados:
             st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Busca não encontrada.</h3>", unsafe_allow_html=True)
         else:
@@ -233,6 +226,5 @@ st.markdown("""
         <p>Priorize locais movimentados como shoppings ou estações para negociar. Nunca deposite antes de ver o produto.</p>
     </div>
 """, unsafe_allow_html=True)
-
 st.sidebar.markdown("---")
 st.sidebar.caption("© 2026 JÁ VENDEU? | Sistemas VRS Soluções")
