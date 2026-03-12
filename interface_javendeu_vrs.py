@@ -37,7 +37,8 @@ def conectar_banco_vrs():
                 if "\\n" in p_key:
                     p_key = p_key.replace("\\n", "\n")
                 
-                # Garante que não existam espaços duplos ou erros de colagem no sinal de igual (=)
+                # Garante que não existam espaços ou caracteres inválidos (como o byte 61/sinal de =)
+                # que o Streamlit às vezes insere no final da string do cofre.
                 p_key = p_key.replace(" =", "=").replace("= ", "=")
                 
                 cred_dict["private_key"] = p_key
