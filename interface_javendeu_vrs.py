@@ -3,7 +3,7 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: CORREÇÃO DEFINITIVA DE CONEXÃO SECRETS/PEM (SEM PREJUÍZO)
+# AJUSTE: CONEXÃO HÍBRIDA (PC/ONLINE) E LIMPEZA DE PEM NO SECRETS
 # =================================================================
 
 import streamlit as st
@@ -23,23 +23,25 @@ st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", pa
 def conectar_banco_vrs():
     try:
         if not firebase_admin._apps:
-            # 1. Tenta ler do Secrets (Cofre do Streamlit)
+            # 1. Tenta ler do Secrets (Modo Online no Streamlit Cloud)
             if "textkey" in st.secrets:
                 cred_dict = dict(st.secrets["textkey"])
                 
-                # BLINDAGEM PEM: Garante que a private_key tenha quebras de linha reais (\n)
-                # Isso resolve o erro "Unable to load PEM file"
+                # BLINDAGEM VRS: Limpeza profunda da chave privada
+                # Corrige erros de "Unable to load PEM file" causados por formatação
                 p_key = cred_dict.get("private_key", "")
+                
+                # Remove aspas extras, espaços e converte \n literais para quebras de linha reais
+                p_key = p_key.strip().strip('"').strip("'")
                 if "\\n" in p_key:
                     p_key = p_key.replace("\\n", "\n")
                 
-                # Limpa possíveis aspas residuais da colagem
-                cred_dict["private_key"] = p_key.strip().strip('"').strip("'")
+                cred_dict["private_key"] = p_key
                 
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
             
-            # 2. Fallback para modo local (seu computador)
+            # 2. Fallback para modo local (Seu computador)
             else:
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 path_json = os.path.join(base_dir, "vrs-solucoes-firebase-adminsdk.json")
@@ -47,16 +49,19 @@ def conectar_banco_vrs():
                     cred = credentials.Certificate(path_json)
                     firebase_admin.initialize_app(cred)
                 else:
-                    st.error("Erro Crítico: Chave JSON ou Secrets não encontrados.")
+                    st.error("Erro Crítico VRS: Credenciais não encontradas (Secrets ou JSON).")
                     return None
                     
         return firestore.client()
     except Exception as e:
-        # Erro detalhado para facilitar diagnóstico na VRS Soluções
+        # Reporte detalhado para a VRS Soluções
         st.error(f"Erro de Conexão Segura VRS: {e}")
         return None
 
+# Inicializa o banco de dados
 db = conectar_banco_vrs()
+
+# Carrega listas auxiliares
 lista_cats = categorias.obter_categorias_vrs()
 lista_ufs = estados.obter_estados_vrs()
 lista_filtro_ufs = estados.obter_estados_com_todos_vrs()
