@@ -3,7 +3,7 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: CORREÇÃO DEFINITIVA DE CONEXÃO SECRETS/PEM (SEM PREJUÍZO)
+# AJUSTE: CONEXÃO SEGURA ULTRA-RESILIENTE (FIM DO ERRO PEM/TOML)
 # =================================================================
 
 import streamlit as st
@@ -18,35 +18,40 @@ import estados
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", page_icon="💰")
 
-# --- CONEXÃO FIREBASE (BLINDADA VIA SECRETS - PADRÃO VRS) ---
+# --- CONEXÃO FIREBASE (BLINDAGEM TOTAL VRS) ---
 @st.cache_resource
 def conectar_banco_vrs():
     try:
         if not firebase_admin._apps:
-            # 1. Tenta ler do Secrets (Modo Online no Streamlit Cloud)
+            # 1. TENTA VIA SECRETS (MODO ONLINE)
             if "textkey" in st.secrets:
                 cred_dict = dict(st.secrets["textkey"])
                 
-                # BLINDAGEM VRS: Limpeza profunda da chave privada
-                # Resolve o erro "Unable to load PEM file" (InvalidByte 61)
+                # LIMPEZA PROFISSIONAL DA CHAVE (FIM DO ERRO 61 / PEM)
                 p_key = cred_dict.get("private_key", "")
                 
-                # Remove aspas extras, espaços e garante que as quebras de linha sejam reais (\n)
+                # Remove aspas duplas, simples e espaços invisíveis
                 p_key = p_key.strip().strip('"').strip("'")
                 
+                # Converte \n de texto para quebras de linha REAIS
                 if "\\n" in p_key:
                     p_key = p_key.replace("\\n", "\n")
                 
-                # Garante que não existam espaços ou caracteres inválidos (como o byte 61/sinal de =)
-                # que o Streamlit às vezes insere no final da string do cofre.
-                p_key = p_key.replace(" =", "=").replace("= ", "=")
+                # Garante que a chave comece e termine com os delimitadores PEM
+                if "-----BEGIN PRIVATE KEY-----" not in p_key:
+                    p_key = "-----BEGIN PRIVATE KEY-----\n" + p_key
+                if "-----END PRIVATE KEY-----" not in p_key:
+                    p_key = p_key + "\n-----END PRIVATE KEY-----"
+                
+                # Limpa espaços em branco em cada linha da chave
+                p_key = "\n".join([line.strip() for line in p_key.split("\n") if line.strip()])
                 
                 cred_dict["private_key"] = p_key
                 
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
             
-            # 2. Fallback para modo local (Seu computador)
+            # 2. TENTA VIA ARQUIVO (MODO PC LOCAL)
             else:
                 base_dir = os.path.dirname(os.path.abspath(__file__))
                 path_json = os.path.join(base_dir, "vrs-solucoes-firebase-adminsdk.json")
@@ -54,12 +59,11 @@ def conectar_banco_vrs():
                     cred = credentials.Certificate(path_json)
                     firebase_admin.initialize_app(cred)
                 else:
-                    st.error("Erro Crítico VRS: Credenciais não encontradas (Secrets ou JSON).")
+                    st.error("Erro Crítico: Configure os Secrets no painel do Streamlit.")
                     return None
                     
         return firestore.client()
     except Exception as e:
-        # Reporte detalhado para a VRS Soluções para facilitar diagnóstico
         st.error(f"Erro de Conexão Segura VRS: {e}")
         return None
 
@@ -119,7 +123,7 @@ menu = st.sidebar.radio("Navegação", ["🛍️ Ver Ofertas", "➕ Anunciar Ago
 
 # --- ABA: CHAT ---
 if menu == "💬 Chat Interno":
-    if not esta_logado: st.warning("⚠️ Faça login.")
+    if not esta_logado: st.warning("⚠️ Faça login para ver suas mensagens.")
     else:
         st.subheader("💬 Minhas Mensagens")
         email_atual = st.session_state['usuario']['email']
@@ -138,7 +142,7 @@ if menu == "💬 Chat Interno":
 
 # --- ABA: ANUNCIAR ---
 elif menu == "➕ Anunciar Agora":
-    if not esta_logado: st.warning("⚠️ Faça login.")
+    if not esta_logado: st.warning("⚠️ Faça login para anunciar.")
     else:
         st.subheader("📢 Criar Novo Anúncio")
         with st.form("form_venda_vrs", clear_on_submit=True):
@@ -243,7 +247,7 @@ elif menu == "🛍️ Ver Ofertas":
             
             resultados = [doc for doc in query.stream() if busca.lower() in doc.to_dict().get('nome', '').lower()]
             if not resultados:
-                st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Busca não encontrada.</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Nada encontrado.</h3>", unsafe_allow_html=True)
             else:
                 for doc in resultados:
                     it = doc.to_dict()
