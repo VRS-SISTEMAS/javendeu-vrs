@@ -3,13 +3,14 @@
 # JÁ VENDEU? - PLATAFORMA DE NEGÓCIOS RÁPIDOS
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
-# AJUSTE: STATUS ONLINE DO VENDEDOR NOS DETALHES + MANUTENÇÃO TOTAL
+# AJUSTE: BLINDAGEM DE CONEXÃO FIREBASE PARA DEPLOY ONLINE
 # =================================================================
 
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 import datetime
+import os  # Necessário para localizar caminhos no servidor
 import usuarios_vrs
 import categorias
 import estados 
@@ -17,15 +18,24 @@ import estados
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", page_icon="💰")
 
-# --- CONEXÃO FIREBASE ---
+# --- CONEXÃO FIREBASE (VERSÃO DEPLOY ONLINE) ---
 def conectar_banco_vrs():
     try:
         if not firebase_admin._apps:
-            cred = credentials.Certificate("vrs-solucoes-firebase-adminsdk.json")
+            # Padrão VRS: Localiza o arquivo de chave na raiz do projeto
+            base_path = os.path.dirname(__file__)
+            path_json = os.path.join(base_path, "vrs-solucoes-firebase-adminsdk.json")
+            
+            # Validação amigável para o log do servidor
+            if not os.path.exists(path_json):
+                st.error("Erro Crítico: Arquivo de chave do Firebase não encontrado no repositório.")
+                return None
+                
+            cred = credentials.Certificate(path_json)
             firebase_admin.initialize_app(cred)
         return firestore.client()
     except Exception as e:
-        st.error(f"Erro de Conexão VRS: {e}")
+        st.error(f"Erro de Conexão VRS no Servidor: {e}")
         return None
 
 db = conectar_banco_vrs()
@@ -59,7 +69,6 @@ st.markdown("""
     input, textarea, select { background-color: #262730 !important; color: white !important; border: 1px solid #4B4B4B !important; }
     .stButton>button { background-color: #FF4B4B !important; color: white !important; border-radius: 5px; font-weight: bold; }
     
-    /* STATUS ONLINE */
     .vrs-online { color: #00FF00; font-weight: bold; font-size: 14px; }
     .vrs-offline { color: #888888; font-weight: bold; font-size: 14px; }
 
@@ -118,8 +127,8 @@ elif menu == "➕ Anunciar Agora":
             f1 = st.text_input("Foto 1 (Principal)")
             f2 = st.text_input("Foto 2")
             
-            st.info("⚠️ **Termos de Uso:** Proibido o uso de imagens abusivas, impróprias ou ilegais. O 'JÁ VENDEU?' atua apenas como vitrine publicitária. Não nos responsabilizamos por negociações.")
-            aceite = st.checkbox("Eu li e aceito que sou o único responsável pela veracidade e ética deste anúncio.")
+            st.info("⚠️ **Termos de Uso:** Proibido o uso de imagens abusivas, impróprias ou ilegais. O 'JÁ VENDEU?' atua apenas como vitrine publicitária.")
+            aceite = st.checkbox("Eu li e aceito que sou o único responsável pela veracidade deste anúncio.")
 
             if st.form_submit_button("🚀 PUBLICAR"):
                 if aceite and nome and preco > 0 and f1:
@@ -176,7 +185,6 @@ elif menu == "🛍️ Ver Ofertas":
                     st.rerun()
         with c_img: st.markdown(f"<div class='main-photo-container'><img src='{gal[st.session_state.foto_index]}'></div>", unsafe_allow_html=True)
 
-        # --- CONSULTA STATUS DO VENDEDOR ---
         vendedor_ref = db.collection("usuarios").document(it['email_dono']).get()
         v_info = vendedor_ref.to_dict() if vendedor_ref.exists else {}
         is_online = v_info.get('status_vrs') == 'online'
@@ -198,20 +206,6 @@ elif menu == "🛍️ Ver Ofertas":
         with c2:
             if pode_ver_zap: st.success(f"📱 WhatsApp: {it.get('zap')}")
             else: st.info("🔒 Vendedor atende apenas pelo Chat.")
-
-        if st.session_state.get("abrir_chat"):
-            with st.form("msg_vrs"):
-                txt = st.text_area("Sua mensagem:")
-                if st.form_submit_button("ENVIAR"):
-                    db.collection("mensagens").add({
-                        "anuncio_id": doc.id, "anuncio_nome": it['nome'],
-                        "remetente_email": st.session_state['usuario']['email'],
-                        "remetente_nome": st.session_state['usuario']['nome'],
-                        "participantes": [st.session_state['usuario']['email'], it['email_dono']],
-                        "texto": txt, "data": datetime.datetime.now()
-                    })
-                    st.success("Enviada!")
-                    del st.session_state.abrir_chat
     else:
         query = db.collection("anuncios").where("status", "==", "ativo")
         query = categorias.filtrar_por_categoria(query, filtro_cat)
@@ -220,7 +214,7 @@ elif menu == "🛍️ Ver Ofertas":
         resultados = [doc for doc in query.stream() if busca.lower() in doc.to_dict().get('nome', '').lower()]
         
         if not resultados:
-            st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Busca não encontrada para este filtro.</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center; color: #888;'>🔍 Busca não encontrada.</h3>", unsafe_allow_html=True)
         else:
             for doc in resultados:
                 it = doc.to_dict()
@@ -230,12 +224,11 @@ elif menu == "🛍️ Ver Ofertas":
                     st.session_state.detalhe_id = doc.id
                     st.rerun()
 
-# --- RODAPÉ DE SEGURANÇA ---
+# --- RODAPÉ ---
 st.markdown("""
     <div class='footer-vrs'>
         <p class='footer-warning'>🛡️ SEGURANÇA VRS SOLUÇÕES</p>
-        <p>Ao negociar, priorize sua segurança: procure sempre locais movimentados como <b>shoppings, estações de trem/metrô ou postos de gasolina</b> com fluxo de pessoas. Nunca faça depósitos antecipados sem ver o produto.</p>
-        <p style='font-size: 12px; color: #888;'>© 2026 JÁ VENDEU? - A sua vitrine de negócios rápidos.</p>
+        <p>Priorize sempre locais movimentados para negociar. Nunca faça depósitos antecipados.</p>
     </div>
 """, unsafe_allow_html=True)
 
