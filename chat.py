@@ -1,57 +1,94 @@
 # =================================================================
-# VRS Soluções - JÁ VENDEU? - MÓDULO: chat.py
-# CHAT EM TEMPO REAL COM SUPORTE A ÍNDICES FIREBASE
+# VRS SISTEMAS
+# JÁ VENDEU? - GESTÃO DE CHAT INTEGRADO (ESTILO WHATSAPP)
+# MÓDULO: chat.py
+# DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
 import datetime
 
 def exibir_interface_chat(db):
+    """Renderiza a interface de mensagens WhatsApp Style."""
     if 'usuario' not in st.session_state or st.session_state['usuario'] is None:
-        st.warning("⚠️ Faça login para ver suas conversas.")
+        st.warning("⚠️ Por favor, faça login para acessar suas conversas.")
         return
 
     email_logado = st.session_state['usuario']['email']
 
-    # Estilo Visual das Bolhas
+    # Estilo Visual das Bolhas (WhatsApp Dark)
     st.markdown("""
         <style>
-        .balao-eu { align-self: flex-end; background-color: #056162; color: white; padding: 10px; border-radius: 10px 10px 0 10px; margin-bottom: 10px; text-align: right; }
-        .balao-outro { align-self: flex-start; background-color: #262D31; color: white; padding: 10px; border-radius: 10px 10px 10px 0; margin-bottom: 10px; }
+        .chat-vrs-bubble { display: flex; flex-direction: column; margin-bottom: 15px; width: 100%; }
+        .balao-eu {
+            align-self: flex-end; background-color: #056162; color: white; padding: 12px;
+            border-radius: 15px 15px 0px 15px; max-width: 75%; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        .balao-outro {
+            align-self: flex-start; background-color: #262D31; color: white; padding: 12px;
+            border-radius: 15px 15px 15px 0px; max-width: 75%; border: 1px solid #444;
+        }
+        .info-msg { font-size: 0.7rem; color: #aaa; margin-top: 5px; display: block; }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<h2 style='text-align: center; color: #FF4B4B;'>💬 NEGOCIAÇÕES</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #FF4B4B;'>💬 MINHAS NEGOCIAÇÕES</h2>", unsafe_allow_html=True)
 
     try:
-        # ATENÇÃO: É esta query que exige o índice no Firebase
+        # Busca mensagens envolvidas com o usuário atual (Exige índice no Firebase)
         msgs_ref = db.collection("mensagens_chat").where("envolvidos", "array_contains", email_logado).order_by("timestamp", direction="ASCENDING").stream()
         
-        with st.container(height=450, border=True):
-            count = 0
+        with st.container(height=500, border=True):
+            encontradas = False
             for m in msgs_ref:
-                count += 1
+                encontradas = True
                 msg = m.to_dict()
                 sou_eu = msg['remetente_email'] == email_logado
                 classe = "balao-eu" if sou_eu else "balao-outro"
                 nome = "Você" if sou_eu else msg['remetente_nome']
 
-                st.markdown(f"<div class='{classe}'><b>{nome}</b><br>{msg['texto']}<br><small style='font-size: 10px;'>{msg['hora']} - {msg.get('produto_ref', '')}</small></div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="chat-vrs-bubble">
+                        <div class="{classe}">
+                            <b style='color: #FF4B4B; font-size: 0.85rem;'>{nome}</b><br>
+                            {msg['texto']}
+                            <span class="info-msg">{msg['hora']} - {msg.get('produto_ref', 'Geral')}</span>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
 
-            if count == 0:
-                st.info("Nenhuma conversa por aqui ainda. Inicie um interesse na Home!")
+            if not encontradas:
+                st.info("Nenhuma conversa ativa ainda. Inicie um interesse na Home!")
 
     except Exception as e:
-        # Se o índice ainda estiver sendo criado, ele mostra o link aqui
-        st.error(f"Aguardando ativação do índice no Firebase...")
-        st.caption(f"Detalhe: {e}")
+        st.error(f"⚠️ Aguardando sincronização do chat no Firebase...")
+        st.caption(f"Ref: {e}")
 
     st.markdown("---")
-    
-    # Campo de envio fixo
+
+    # Campo de Envio Fixo
     if 'vrs_chat_ativo' in st.session_state:
-        with st.form("enviar_msg", clear_on_submit=True):
-            txt = st.text_input("Sua mensagem:")
-            if st.form_submit_button("ENVIAR 🚀"):
+        destinatario = st.session_state['vrs_chat_ativo']
+        with st.form("form_msg_vrs", clear_on_submit=True):
+            col_txt, col_btn = st.columns([8, 2])
+            txt = col_txt.text_input("Escreva sua mensagem...")
+            if col_btn.form_submit_button("ENVIAR 🚀"):
                 if txt:
-                    enviar_mensagem_vrs(db, st.session_state['vrs_chat_ativo'], txt, st.session_state.get('vrs_produto_atual', 'Geral'))
+                    enviar_mensagem_vrs(db, destinatario, txt, st.session_state.get('vrs_produto_atual', 'Geral'))
                     st.rerun()
+    else:
+        st.caption("ℹ️ Selecione um produto na Vitrine e clique em 'Tenho Interesse' para conversar.")
+
+def enviar_mensagem_vrs(db, destinatario_email, texto, produto_nome="Geral"):
+    """Grava os dados da mensagem no Firestore."""
+    email_logado = st.session_state['usuario']['email']
+    nome_logado = st.session_state['usuario']['nome']
+    db.collection("mensagens_chat").add({
+        "texto": texto, 
+        "remetente_email": email_logado, 
+        "remetente_nome": nome_logado,
+        "destinatario_email": destinatario_email, 
+        "envolvidos": [email_logado, destinatario_email],
+        "produto_ref": produto_nome, 
+        "hora": datetime.datetime.now().strftime("%H:%M"),
+        "timestamp": datetime.datetime.now()
+    })

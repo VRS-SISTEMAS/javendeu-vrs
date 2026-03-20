@@ -1,13 +1,13 @@
 # =================================================================
-# VRS Soluções
-# JÁ VENDEU? - INTERFACE MESTRE COM BOTÃO DE RESGATE DA BARRA
+# VRS SISTEMAS
+# JÁ VENDEU? - INTERFACE MESTRE COM DESIGN OLX STYLE
 # MÓDULO: interface_javendeu_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
 
 def aplicar_estilo_vrs():
-    """Aplica o CSS customizado para manter a identidade visual da VRS Soluções."""
+    """Aplica o CSS customizado para manter a identidade visual da VRS SISTEMAS."""
     st.markdown("""
         <style>
         /* Estilo do Título Central */
@@ -43,16 +43,33 @@ def aplicar_estilo_vrs():
             z-index: 999999;
         }
         
-        /* Cor da setinha branca dentro do controle vermelho */
         [data-testid="stSidebarCollapsedControl"] svg {
             fill: white !important;
             width: 40px !important;
             height: 40px !important;
         }
 
-        /* Deixa o header transparente para focar no design */
-        header[data-testid="stHeader"] {
-            background: rgba(0,0,0,0);
+        header[data-testid="stHeader"] { background: rgba(0,0,0,0); }
+
+        /* --- DESIGN OLX: CONTROLE DE IMAGEM --- */
+        .stImage > img {
+            max-height: 480px !important;
+            width: auto !important;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+            border-radius: 12px;
+            object-fit: contain;
+            background-color: #0E1117;
+            border: 1px solid #333;
+        }
+
+        /* Galeria de miniaturas */
+        .vrs-galeria {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -81,7 +98,7 @@ def exibir_rodape_vrs():
     st.markdown("""
         <div style='margin-top: 80px; padding: 40px; text-align: center; border-top: 1px solid #333; background-color: #111;'>
             <h4 style='color: #FF4B4B;'>📜 REGRAS E SEGURANÇA</h4>
-            <p style='color: #444; font-size: 11px; margin-top: 25px;'>© 2026 JÁ VENDEU? | Desenvolvido por VRS Soluções</p>
+            <p style='color: #444; font-size: 11px; margin-top: 25px;'>© 2026 JÁ VENDEU? | Desenvolvido por VRS SISTEMAS</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -94,7 +111,6 @@ def obter_menu_lateral_vrs():
             st.session_state['anuncio_detalhe'] = None
             st.rerun()
         
-        # Só exibe opções extras se o usuário estiver logado
         if st.session_state.get('logado'):
             if st.button("➕ ANUNCIAR", use_container_width=True): 
                 st.session_state['pagina_vrs'] = "Anunciar"
