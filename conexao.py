@@ -1,46 +1,30 @@
 # =================================================================
 # VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: conexao.py (VERSÃO BLINDADA CONTRA ERROS DE PEM)
+# MÓDULO: conexao.py (VERSÃO FINAL ANTI-PADDYNG)
 # =================================================================
 import firebase_admin
 from firebase_admin import credentials, firestore
 import streamlit as st
-import os
 
 def conectar_banco_vrs():
     if not firebase_admin._apps:
         try:
             if "firebase" in st.secrets:
-                # Criamos uma cópia para não mexer no original
                 creds_dict = dict(st.secrets["firebase"])
+                # Limpeza de segurança para evitar o erro InvalidPadding
+                if "private_key" in creds_dict:
+                    # Remove aspas extras e garante que as quebras sejam reais
+                    key = creds_dict["private_key"].replace("\\n", "\n").strip()
+                    if key.startswith("'") or key.startswith('"'):
+                        key = key[1:-1]
+                    creds_dict["private_key"] = key
                 
-                # --- LIMPEZA BRAVA DA IARA ---
-                raw_key = creds_dict.get("private_key", "")
-                
-                # 1. Troca o texto '\n' por quebras de linha reais
-                # 2. Remove espaços sobrando no início e fim
-                # 3. Garante que as bordas do certificado existam
-                clean_key = raw_key.replace("\\n", "\n").strip()
-                
-                if "-----BEGIN PRIVATE KEY-----" not in clean_key:
-                    clean_key = "-----BEGIN PRIVATE KEY-----\n" + clean_key
-                if "-----END PRIVATE KEY-----" not in clean_key:
-                    clean_key = clean_key + "\n-----END PRIVATE KEY-----"
-                
-                creds_dict["private_key"] = clean_key
-                # -----------------------------
-
                 cred = credentials.Certificate(creds_dict)
                 firebase_admin.initialize_app(cred)
             else:
-                caminho = "vrs-solucoes-firebase-adminsdk.json"
-                if os.path.exists(caminho):
-                    cred = credentials.Certificate(caminho)
-                    firebase_admin.initialize_app(cred)
-                else:
-                    st.error("⚠️ Secrets não configurados.")
-                    return None
+                cred = credentials.Certificate("vrs-solucoes-firebase-adminsdk.json")
+                firebase_admin.initialize_app(cred)
         except Exception as e:
-            st.error(f"❌ Erro de Conexão VRS SISTEMAS: {e}")
+            st.error(f"❌ Erro de Conexão VRS: {e}")
             return None
     return firestore.client()
