@@ -1,7 +1,7 @@
 # =================================================================
 # VRS SISTEMAS
 # JÁ VENDEU? - MÓDULO: principal.py
-# FUNÇÕES: VITRINE E DETALHES (CARROSSEL ESTILO OLX)
+# FUNÇÕES: VITRINE E DETALHES (CARROSSEL REAL ESTILO OLX)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -23,6 +23,30 @@ importlib.reload(chat)
 interface_javendeu_vrs.aplicar_estilo_vrs()
 db = conexao.conectar_banco_vrs()
 
+# CSS Extra para travar o tamanho da imagem e estilizar as miniaturas
+st.markdown("""
+    <style>
+    /* Trava a imagem principal para não ficar gigante */
+    .img-principal-vrs img {
+        max-height: 450px !important;
+        object-fit: contain !important;
+        background-color: #000;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+    /* Estilo das miniaturas clicáveis */
+    .stButton > button.vrs-thumb-btn {
+        border: 2px solid #333;
+        padding: 0px;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .stButton > button.vrs-thumb-btn:hover {
+        border-color: #FF4B4B;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 if 'pagina_vrs' not in st.session_state: st.session_state['pagina_vrs'] = "Home"
 if 'anuncio_detalhe' not in st.session_state: st.session_state['anuncio_detalhe'] = None
 if 'foto_index' not in st.session_state: st.session_state['foto_index'] = 0
@@ -36,11 +60,11 @@ interface_javendeu_vrs.obter_menu_lateral_vrs()
 
 # --- LÓGICA DE EXIBIÇÃO ---
 if st.session_state['anuncio_detalhe']:
-    # SEÇÃO: DETALHES DO PRODUTO (O Rodapé NÃO aparece aqui para não poluir)
+    # SEÇÃO: DETALHES DO PRODUTO (Estilo Carrossel OLX)
     item = st.session_state['anuncio_detalhe']
     st.markdown(f"## {item.get('titulo', 'Produto')}")
     
-    col_img, col_info = st.columns([1.2, 1])
+    col_img, col_info = st.columns([1.3, 1])
     
     with col_img:
         fotos = item.get('fotos', [])
@@ -50,25 +74,33 @@ if st.session_state['anuncio_detalhe']:
             idx = st.session_state['foto_index']
             if idx >= len(fotos): idx = 0
             
+            # EXIBIÇÃO DA FOTO PRINCIPAL (COM TRAVA DE TAMANHO)
+            st.markdown('<div class="img-principal-vrs">', unsafe_allow_html=True)
             st.image(f"data:image/jpeg;base64,{fotos[idx]}", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             
+            # MINIATURAS ESTILO CARROSSEL (FOTOS REAIS EMBAIXO)
             if len(fotos) > 1:
-                st.markdown('<div class="vrs-galeria">', unsafe_allow_html=True)
-                m_cols = st.columns(len(fotos))
+                st.markdown("---")
+                # Criamos colunas pequenas para as miniaturas
+                m_cols = st.columns(8) # Até 8 espaços para ficar alinhado
                 for i in range(len(fotos)):
                     with m_cols[i]:
-                        if st.button(f"Foto {i+1}", key=f"thumb_{i}", use_container_width=True):
+                        # Botão que mostra a própria foto como miniatura
+                        if st.button(f"📷", key=f"thumb_vrs_{i}", use_container_width=True, help="Ver foto"):
                             st.session_state['foto_index'] = i
                             st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+                        # Mostra a fotinho pequena embaixo do botão para o usuário saber qual é
+                        st.image(f"data:image/jpeg;base64,{fotos[i]}", width=60)
         else:
-            st.warning("⚠️ Sem fotos.")
+            st.warning("⚠️ Sem fotos disponíveis.")
 
     with col_info:
         with st.container(border=True):
             st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {item.get('preco', 0.0):.2f}</h1>", unsafe_allow_html=True)
             st.info(f"📁 Categoria: {item.get('categoria', 'Geral')}")
-            st.write(f"📝 {item.get('descricao', 'Sem descrição.')}")
+            st.write(f"**Descrição:**")
+            st.write(item.get('descricao', 'Sem descrição.'))
             st.markdown("---")
             
             if st.button("💬 TENHO INTERESSE / ABRIR CHAT", key="btn_chat_detalhe", use_container_width=True, type="primary"):
@@ -88,7 +120,7 @@ if st.session_state['anuncio_detalhe']:
                 st.rerun()
 
 else:
-    # SEÇÃO: PÁGINAS GERAIS (O Rodapé APARECE aqui)
+    # SEÇÃO: PÁGINAS GERAIS (Vitrine, Anunciar, Meus Anúncios)
     pag = st.session_state['pagina_vrs']
     
     if pag == "Home":
@@ -110,8 +142,10 @@ else:
                     for idx, anuncio in enumerate(lista_anuncios):
                         with cols_vitrine[idx % 4]:
                             with st.container(border=True):
+                                # Foto de capa da vitrine
                                 f_capa = anuncio['fotos'][0] if 'fotos' in anuncio and anuncio['fotos'] else anuncio.get('foto', "")
-                                if f_capa: st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
+                                if f_capa: 
+                                    st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
                                 st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
                                 st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
@@ -127,5 +161,5 @@ else:
     elif pag == "Chat":
         chat.exibir_interface_chat(db)
 
-    # CHAMADA DO RODAPÉ: Apenas para as páginas acima
+    # CHAMADA DO RODAPÉ
     interface_javendeu_vrs.exibir_rodape_vrs()
