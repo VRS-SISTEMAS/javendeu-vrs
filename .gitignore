@@ -1,3 +1,11 @@
+# Ignorar chaves secretas do Firebase
 *.json
+
+# Ignorar lixo do Python
 __pycache__/
+*.pyc
+
+# Ignorar pastas de ambiente virtual
 .venv/
+env/
+venv/
