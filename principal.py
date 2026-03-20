@@ -34,7 +34,9 @@ with col_login:
 
 interface_javendeu_vrs.obter_menu_lateral_vrs()
 
+# --- LÓGICA DE EXIBIÇÃO ---
 if st.session_state['anuncio_detalhe']:
+    # SEÇÃO: DETALHES DO PRODUTO (O Rodapé NÃO aparece aqui para não poluir)
     item = st.session_state['anuncio_detalhe']
     st.markdown(f"## {item.get('titulo', 'Produto')}")
     
@@ -48,10 +50,8 @@ if st.session_state['anuncio_detalhe']:
             idx = st.session_state['foto_index']
             if idx >= len(fotos): idx = 0
             
-            # Foto principal travada pelo CSS do interface_vrs
             st.image(f"data:image/jpeg;base64,{fotos[idx]}", use_container_width=True)
             
-            # Miniaturas compactas estilo OLX
             if len(fotos) > 1:
                 st.markdown('<div class="vrs-galeria">', unsafe_allow_html=True)
                 m_cols = st.columns(len(fotos))
@@ -71,7 +71,7 @@ if st.session_state['anuncio_detalhe']:
             st.write(f"📝 {item.get('descricao', 'Sem descrição.')}")
             st.markdown("---")
             
-            if st.button("💬 TENHO INTERESSE / ABRIR CHAT", use_container_width=True, type="primary"):
+            if st.button("💬 TENHO INTERESSE / ABRIR CHAT", key="btn_chat_detalhe", use_container_width=True, type="primary"):
                 if st.session_state.get('logado'):
                     st.session_state['vrs_chat_ativo'] = item['vendedor_email']
                     st.session_state['vrs_produto_atual'] = item['titulo']
@@ -88,8 +88,9 @@ if st.session_state['anuncio_detalhe']:
                 st.rerun()
 
 else:
-    # Lógica da Home (Vitrine) - Sem alterações para não quebrar nada
+    # SEÇÃO: PÁGINAS GERAIS (O Rodapé APARECE aqui)
     pag = st.session_state['pagina_vrs']
+    
     if pag == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
         interface_javendeu_vrs.exibir_conversor_vrs()
@@ -119,9 +120,12 @@ else:
                                     st.rerun()
         except Exception as e:
             st.error(f"Erro na vitrine: {e}")
+            
     elif pag in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
+        
     elif pag == "Chat":
         chat.exibir_interface_chat(db)
 
-interface_javendeu_vrs.exibir_rodape_vrs()
+    # CHAMADA DO RODAPÉ: Apenas para as páginas acima
+    interface_javendeu_vrs.exibir_rodape_vrs()
