@@ -1,14 +1,28 @@
 # =================================================================
 # VRS SISTEMAS
-# JÁ VENDEU? - GESTÃO DE CHAT TURBO (COM SELETOR E STATUS ONLINE)
+# JÁ VENDEU? - GESTÃO DE CHAT TURBO (COM NOTIFICAÇÃO SONORA E SELETOR)
 # MÓDULO: chat.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
 import datetime
+import streamlit.components.v1 as components
+
+def tocar_campainha_vrs():
+    """Injeta JavaScript para tocar som de notificação."""
+    # Som de alerta profissional (Ping)
+    audio_url = "https://www.soundjay.com/buttons/beep-07a.mp3"
+    components.html(
+        f"""
+        <audio autoplay>
+            <source src="{audio_url}" type="audio/mp3">
+        </audio>
+        """,
+        height=0,
+    )
 
 def exibir_interface_chat(db):
-    """Renderiza a interface completa de chat com lista de contatos e status online."""
+    """Renderiza a interface completa de chat com lista de contatos e alerta sonoro."""
     if 'usuario' not in st.session_state or st.session_state['usuario'] is None:
         st.warning("⚠️ Por favor, faça login para acessar suas conversas.")
         return
@@ -57,22 +71,31 @@ def exibir_interface_chat(db):
         
         lista_geral = [m.to_dict() for m in msgs_ref]
 
+        # --- LÓGICA DA CAMPAINHA (NOTIFICAÇÃO) ---
+        if 'vrs_total_msgs' not in st.session_state:
+            st.session_state['vrs_total_msgs'] = len(lista_geral)
+        
+        # Se o número de mensagens cresceu
+        if len(lista_geral) > st.session_state['vrs_total_msgs']:
+            # Só toca se a última mensagem NÃO for do usuário logado
+            if lista_geral[-1]['remetente_email'] != email_logado:
+                tocar_campainha_vrs()
+            st.session_state['vrs_total_msgs'] = len(lista_geral)
+
         if not lista_geral:
             st.info("👋 Nenhuma conversa ainda. Seus chats aparecerão aqui assim que alguém tiver interesse nos seus produtos!")
             return
 
-        # 2. SEPARA OS CONTATOS (Quem conversou comigo)
-        contatos = {} # Usar dict para guardar o nome junto
+        # 2. SEPARA OS CONTATOS
+        contatos = {}
         for m in lista_geral:
-            # Pega o e-mail da outra pessoa
             outro_email = m['envolvidos'][0] if m['envolvidos'][1] == email_logado else m['envolvidos'][1]
-            # Pega o nome (se for remetente e não for eu, pega o nome)
             if m['remetente_email'] != email_logado:
                 contatos[outro_email] = m['remetente_nome']
             elif outro_email not in contatos:
                 contatos[outro_email] = "Interessado"
 
-        # 3. LAYOUT DE DUAS COLUNAS (LISTA À ESQUERDA | CHAT À DIREITA)
+        # 3. LAYOUT DE DUAS COLUNAS
         col_contatos, col_conversa = st.columns([1, 2.5])
 
         with col_contatos:
@@ -88,10 +111,8 @@ def exibir_interface_chat(db):
                 destinatario = st.session_state['vrs_chat_ativo']
                 st.markdown(f"#### 🗨️ Conversa com {st.session_state.get('vrs_nome_ativo', destinatario)}")
                 
-                # Container de Mensagens
                 with st.container(height=450, border=True):
                     for msg in lista_geral:
-                        # Só mostra as mensagens entre eu e o contato selecionado
                         if destinatario in msg['envolvidos']:
                             sou_eu = msg['remetente_email'] == email_logado
                             classe = "balao-eu" if sou_eu else "balao-outro"
@@ -113,25 +134,17 @@ def exibir_interface_chat(db):
                             enviar_mensagem_vrs(db, destinatario, msg_txt, "Resposta Direta")
                             st.rerun()
             else:
-                st.markdown("""
-                    <div style='text-align: center; margin-top: 100px; color: #666;'>
-                        <h3>⬅️ Selecione um contato</h3>
-                        <p>para ver o histórico e responder.</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown("<div style='text-align: center; margin-top: 100px; color: #666;'><h3>⬅️ Selecione um contato</h3></div>", unsafe_allow_html=True)
 
     except Exception as e:
         st.error("🚨 ERRO DE SINCRONIZAÇÃO")
-        st.write("Vitor, o chat está crescendo! Clique no link de índice no log do Streamlit se este erro persistir.")
         st.caption(f"Log: {e}")
 
 def enviar_mensagem_vrs(db, destinatario_email, texto, produto_nome="Geral"):
     """Grava a mensagem garantindo os campos da VRS SISTEMAS."""
     if 'usuario' not in st.session_state: return
-    
     email_logado = st.session_state['usuario']['email']
     nome_logado = st.session_state['usuario']['nome']
-    
     db.collection("mensagens_chat").add({
         "texto": texto, 
         "remetente_email": email_logado, 
