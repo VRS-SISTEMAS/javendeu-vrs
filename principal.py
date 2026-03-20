@@ -1,7 +1,7 @@
 # =================================================================
 # VRS SISTEMAS
 # JÁ VENDEU? - MÓDULO: principal.py
-# FUNÇÕES: VITRINE E DETALHES (CARROSSEL FIXO ESTILO OLX)
+# FUNÇÕES: VITRINE E DETALHES (CARROSSEL FIXO ESTILO OLX + LOCALIZAÇÃO)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -30,7 +30,7 @@ st.markdown("""
         background-color: #0E1117;
         border: 1px solid #333;
         border-radius: 10px;
-        height: 400px; /* ALTURA FIXA PARA NÃO EMPURRAR O CHAT */
+        height: 400px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -41,10 +41,7 @@ st.markdown("""
         max-width: 100%;
         object-fit: contain;
     }
-    /* Deixa as abas do carrossel menores */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-    }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         height: 40px;
         padding: 0 20px;
@@ -69,30 +66,25 @@ if st.session_state['anuncio_detalhe']:
     item = st.session_state['anuncio_detalhe']
     st.markdown(f"## {item.get('titulo', 'Produto')}")
     
-    col_img, col_info = st.columns([1.5, 1]) # Coluna da foto maior, mas controlada
+    col_img, col_info = st.columns([1.5, 1])
     
     with col_img:
         fotos = item.get('fotos', [])
         if not fotos and 'foto' in item: fotos = [item['foto']]
-        
         if fotos:
-            # CARROSSEL POR ABAS (Não recarrega a página, não pula a tela)
             titulos_fotos = [f"FOTO {i+1}" for i in range(len(fotos))]
             tabs_carrossel = st.tabs(titulos_fotos)
-            
             for i, f_b64 in enumerate(fotos):
                 with tabs_carrossel[i]:
-                    st.markdown(f"""
-                        <div class="moldura-foto-vrs">
-                            <img src="data:image/jpeg;base64,{f_b64}">
-                        </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f'<div class="moldura-foto-vrs"><img src="data:image/jpeg;base64,{f_b64}"></div>', unsafe_allow_html=True)
         else:
             st.warning("⚠️ Sem fotos disponíveis.")
 
     with col_info:
         with st.container(border=True):
             st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {item.get('preco', 0.0):.2f}</h1>", unsafe_allow_html=True)
+            # EXIBIÇÃO DA LOCALIZAÇÃO NOS DETALHES
+            st.markdown(f"📍 **{item.get('cidade', 'N/A')} - {item.get('estado', 'N/A')}**")
             st.markdown(f"**📁 Categoria:** {item.get('categoria', 'Geral')}")
             st.markdown("---")
             st.write("**Descrição:**")
@@ -115,7 +107,6 @@ if st.session_state['anuncio_detalhe']:
                 st.rerun()
 
 else:
-    # SEÇÃO: PÁGINAS GERAIS
     pag = st.session_state['pagina_vrs']
     if pag == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
@@ -141,6 +132,8 @@ else:
                                     st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
                                 st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
                                 st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
+                                # EXIBIÇÃO DA LOCALIZAÇÃO NA VITRINE
+                                st.caption(f"📍 {anuncio.get('cidade', 'N/A')} ({anuncio.get('estado', 'N/A')})")
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
