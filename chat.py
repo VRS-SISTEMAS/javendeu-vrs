@@ -71,7 +71,7 @@ def exibir_interface_chat(db):
         lista_geral = []
         for m in msgs_ref:
             d = m.to_dict()
-            d['id'] = m.id # Guarda o ID do documento para exclusão
+            d['id'] = m.id 
             lista_geral.append(d)
 
         # --- LÓGICA DA CAMPAINHA ---
@@ -90,19 +90,21 @@ def exibir_interface_chat(db):
         # 2. SEPARA OS CONTATOS
         contatos = {}
         for m in lista_geral:
-            outro_email = m['envolvidos'][0] if m['envolvidos'][1] == email_logado else m['envolvidos'][1]
-            if m['remetente_email'] != email_logado:
-                contatos[outro_email] = m['remetente_nome']
-            elif outro_email not in contatos:
-                contatos[outro_email] = "Interessado"
+            # Pega o outro envolvido (que não seja o logado)
+            outros = [e for e in m['envolvidos'] if e != email_logado]
+            if outros:
+                outro_email = outros[0]
+                if m['remetente_email'] != email_logado:
+                    contatos[outro_email] = m['remetente_nome']
+                elif outro_email not in contatos:
+                    contatos[outro_email] = "Interessado"
 
-        # 3. LAYOUT DE DUAS COLUNAS (LISTA À ESQUERDA | CHAT À DIREITA)
+        # 3. LAYOUT DE DUAS COLUNAS
         col_contatos, col_conversa = st.columns([1.2, 2.5])
 
         with col_contatos:
             st.markdown("### 👥 Contatos")
             for c_email, c_nome in contatos.items():
-                # Container para cada contato com botão de exclusão
                 with st.container(border=True):
                     c_btn, c_del = st.columns([4, 1])
                     if c_btn.button(f"👤 {c_nome}\n({c_email})", key=f"btn_{c_email}", use_container_width=True):
@@ -110,18 +112,13 @@ def exibir_interface_chat(db):
                         st.session_state['vrs_nome_ativo'] = c_nome
                         st.rerun()
                     
-                    # BOTÃO DE EXCLUIR CONTATO (LIXEIRA)
-                    if c_del.button("🗑️", key=f"del_{c_email}", help=f"Excluir conversa com {c_nome}"):
-                        # Deleta todas as mensagens trocadas com este contato
+                    if c_del.button("🗑️", key=f"del_{c_email}", help=f"Excluir conversa"):
                         for m in lista_geral:
                             if c_email in m['envolvidos']:
                                 db.collection("mensagens_chat").document(m['id']).delete()
-                        
-                        # Se o contato excluído era o ativo, limpa a conversa da tela
                         if st.session_state.get('vrs_chat_ativo') == c_email:
                             st.session_state['vrs_chat_ativo'] = None
-                        
-                        st.success("Conversa excluída!")
+                        st.success("Limpo!")
                         st.rerun()
 
         with col_conversa:
@@ -129,27 +126,32 @@ def exibir_interface_chat(db):
                 destinatario = st.session_state['vrs_chat_ativo']
                 st.markdown(f"#### 🗨️ Conversa com {st.session_state.get('vrs_nome_ativo', destinatario)}")
                 
-                with st.container(height=450, border=True):
-                    for msg in lista_geral:
-                        if destinatario in msg['envolvidos']:
-                            sou_eu = msg['remetente_email'] == email_logado
-                            classe = "balao-eu" if sou_eu else "balao-outro"
-                            st.markdown(f"""
-                                <div class="chat-vrs-bubble">
-                                    <div class="{classe}">
-                                        {msg['texto']}
-                                        <span class="info-msg">{msg['hora']} - Ref: {msg.get('produto_ref', 'Geral')}</span>
+                # --- TRAVA DE SEGURANÇA NO MÓDULO CHAT ---
+                if destinatario == email_logado:
+                    st.error("🚫 Ops! Você não pode conversar consigo mesmo.")
+                    st.info("💡 Use o painel 'Meus Anúncios' para gerenciar seus produtos.")
+                else:
+                    with st.container(height=450, border=True):
+                        for msg in lista_geral:
+                            if destinatario in msg['envolvidos']:
+                                sou_eu = msg['remetente_email'] == email_logado
+                                classe = "balao-eu" if sou_eu else "balao-outro"
+                                st.markdown(f"""
+                                    <div class="chat-vrs-bubble">
+                                        <div class="{classe}">
+                                            {msg['texto']}
+                                            <span class="info-msg">{msg['hora']} - Ref: {msg.get('produto_ref', 'Geral')}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            """, unsafe_allow_html=True)
+                                """, unsafe_allow_html=True)
 
-                with st.form("form_resposta_vrs", clear_on_submit=True):
-                    c_input, c_send = st.columns([8, 2])
-                    msg_txt = c_input.text_input("Sua resposta...", placeholder="Digite aqui...")
-                    if c_send.form_submit_button("ENVIAR 🚀", use_container_width=True):
-                        if msg_txt:
-                            enviar_mensagem_vrs(db, destinatario, msg_txt, "Resposta Direta")
-                            st.rerun()
+                    with st.form("form_resposta_vrs", clear_on_submit=True):
+                        c_input, c_send = st.columns([8, 2])
+                        msg_txt = c_input.text_input("Sua resposta...", placeholder="Digite aqui...")
+                        if c_send.form_submit_button("ENVIAR 🚀", use_container_width=True):
+                            if msg_txt:
+                                enviar_mensagem_vrs(db, destinatario, msg_txt, "Resposta Direta")
+                                st.rerun()
             else:
                 st.markdown("<div style='text-align: center; margin-top: 100px; color: #666;'><h3>⬅️ Selecione um contato</h3></div>", unsafe_allow_html=True)
 
@@ -161,6 +163,8 @@ def enviar_mensagem_vrs(db, destinatario_email, texto, produto_nome="Geral"):
     """Grava a mensagem garantindo os campos da VRS SISTEMAS."""
     if 'usuario' not in st.session_state: return
     email_logado = st.session_state['usuario']['email']
+    if email_logado == destinatario_email: return # Proteção extra no banco
+    
     nome_logado = st.session_state['usuario']['nome']
     db.collection("mensagens_chat").add({
         "texto": texto, 
