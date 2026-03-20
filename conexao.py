@@ -1,7 +1,6 @@
 # =================================================================
-# VRS SISTEMAS
-# JÁ VENDEU? - MÓDULO: conexao.py (CONEXÃO HÍBRIDA SEGURA)
-# DESENVOLVIDO POR: Iara (Gemini) para Vitor
+# VRS SISTEMAS - JÁ VENDEU?
+# MÓDULO: conexao.py (VERSÃO AUTO-CORREÇÃO)
 # =================================================================
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -9,29 +8,29 @@ import streamlit as st
 import os
 
 def conectar_banco_vrs():
-    """Gerencia a conexão com o Firebase protegendo as chaves da VRS SISTEMAS."""
     if not firebase_admin._apps:
         try:
-            # 1. TENTA CONEXÃO VIA SECRETS (QUANDO ESTÁ ONLINE NO STREAMLIT)
+            # 1. TENTA LER DOS SECRETS (ONLINE)
             if "firebase" in st.secrets:
-                # O dict(st.secrets["firebase"]) pega todos os campos que você colou lá
                 creds_dict = dict(st.secrets["firebase"])
+                
+                # LIMPEZA TÉCNICA: Remove espaços ou caracteres de quebra de linha que bugam o PEM
+                if "private_key" in creds_dict:
+                    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+                
                 cred = credentials.Certificate(creds_dict)
                 firebase_admin.initialize_app(cred)
             
-            # 2. TENTA CONEXÃO VIA ARQUIVO LOCAL (QUANDO ESTÁ NO SEU PC)
+            # 2. TENTA LER LOCAL (SEU PC)
             else:
-                caminho_local = "vrs-solucoes-firebase-adminsdk.json"
-                if os.path.exists(caminho_local):
-                    cred = credentials.Certificate(caminho_local)
+                caminho = "vrs-solucoes-firebase-adminsdk.json"
+                if os.path.exists(caminho):
+                    cred = credentials.Certificate(caminho)
                     firebase_admin.initialize_app(cred)
                 else:
-                    st.error("⚠️ Chave do Firebase não encontrada (Arquivo ou Secrets).")
+                    st.error("⚠️ Chave do Firebase não configurada corretamente.")
                     return None
-                    
         except Exception as e:
-            # Mostra o erro exato na tela para sabermos o que corrigir
             st.error(f"❌ Erro de Conexão VRS SISTEMAS: {e}")
             return None
-            
     return firestore.client()
