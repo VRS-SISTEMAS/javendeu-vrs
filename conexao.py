@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: conexao.py (VERSÃO FINAL ANTI-PADDYNG)
+# MÓDULO: conexao.py (VERSÃO SUPREMA - RESOLVE INVALIDLENGTH)
 # =================================================================
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -9,19 +9,22 @@ import streamlit as st
 def conectar_banco_vrs():
     if not firebase_admin._apps:
         try:
+            # Se estivermos no Streamlit Cloud
             if "firebase" in st.secrets:
-                creds_dict = dict(st.secrets["firebase"])
-                # Limpeza de segurança para evitar o erro InvalidPadding
-                if "private_key" in creds_dict:
-                    # Remove aspas extras e garante que as quebras sejam reais
-                    key = creds_dict["private_key"].replace("\\n", "\n").strip()
-                    if key.startswith("'") or key.startswith('"'):
-                        key = key[1:-1]
-                    creds_dict["private_key"] = key
+                creds_dict = {}
+                for key, value in st.secrets["firebase"].items():
+                    # Limpeza especial para a chave privada
+                    if key == "private_key":
+                        # Remove aspas e garante que os \n sejam quebras reais
+                        value = value.replace("\\n", "\n").strip()
+                        if value.startswith("'") or value.startswith('"'):
+                            value = value[1:-1]
+                    creds_dict[key] = value
                 
                 cred = credentials.Certificate(creds_dict)
                 firebase_admin.initialize_app(cred)
             else:
+                # Se estivermos no seu computador
                 cred = credentials.Certificate("vrs-solucoes-firebase-adminsdk.json")
                 firebase_admin.initialize_app(cred)
         except Exception as e:
