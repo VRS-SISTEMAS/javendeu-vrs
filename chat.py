@@ -8,7 +8,7 @@ import streamlit as st
 import datetime
 
 def exibir_interface_chat(db):
-    """Renderiza a interface de mensagens WhatsApp Style."""
+    """Renderiza a interface de mensagens WhatsApp Style com tratamento de índice."""
     if 'usuario' not in st.session_state or st.session_state['usuario'] is None:
         st.warning("⚠️ Por favor, faça login para acessar suas conversas.")
         return
@@ -34,8 +34,11 @@ def exibir_interface_chat(db):
     st.markdown("<h2 style='text-align: center; color: #FF4B4B;'>💬 MINHAS NEGOCIAÇÕES</h2>", unsafe_allow_html=True)
 
     try:
-        # Busca mensagens envolvidas com o usuário atual (Exige índice no Firebase)
-        msgs_ref = db.collection("mensagens_chat").where("envolvidos", "array_contains", email_logado).order_by("timestamp", direction="ASCENDING").stream()
+        # Tenta buscar as mensagens ordenadas por tempo
+        msgs_ref = db.collection("mensagens_chat")\
+                     .where("envolvidos", "array_contains", email_logado)\
+                     .order_by("timestamp", direction="ASCENDING")\
+                     .stream()
         
         with st.container(height=500, border=True):
             encontradas = False
@@ -57,31 +60,47 @@ def exibir_interface_chat(db):
                 """, unsafe_allow_html=True)
 
             if not encontradas:
-                st.info("Nenhuma conversa ativa ainda. Inicie um interesse na Home!")
+                st.info("Nenhuma conversa ativa ainda. Inicie um interesse na Vitrine!")
 
     except Exception as e:
-        st.error(f"⚠️ Aguardando sincronização do chat no Firebase...")
-        st.caption(f"Ref: {e}")
+        # SE CAIR AQUI, É PORQUE O ÍNDICE NÃO FOI CRIADO
+        st.error("🚨 O CHAT PRECISA DE UMA AUTORIZAÇÃO NO FIREBASE")
+        st.markdown(f"""
+            <div style='background-color: #331111; padding: 20px; border-radius: 10px; border: 1px solid #FF4B4B;'>
+                <p style='color: white;'><b>Vitor, faça o seguinte para o chat funcionar agora:</b></p>
+                <ol style='color: #ccc;'>
+                    <li>Abra o log de erro do Streamlit (botão Manage App).</li>
+                    <li>Procure o link azul que começa com <b>https://console.firebase.google.com...</b></li>
+                    <li>Clique nele e depois clique em <b>"Criar Índice"</b>.</li>
+                </ol>
+                <p style='color: #FF4B4B; font-size: 12px;'>O Google leva cerca de 3 minutos para ativar o chat após você clicar.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        # st.caption(f"Erro técnico: {e}") # Descomente se quiser ver o link no site
 
     st.markdown("---")
 
     # Campo de Envio Fixo
     if 'vrs_chat_ativo' in st.session_state:
         destinatario = st.session_state['vrs_chat_ativo']
+        st.caption(f"Conversando sobre: **{st.session_state.get('vrs_produto_atual', 'Geral')}**")
         with st.form("form_msg_vrs", clear_on_submit=True):
             col_txt, col_btn = st.columns([8, 2])
-            txt = col_txt.text_input("Escreva sua mensagem...")
-            if col_btn.form_submit_button("ENVIAR 🚀"):
+            txt = col_txt.text_input("Escreva sua mensagem...", placeholder="Digite aqui...")
+            if col_btn.form_submit_button("ENVIAR 🚀", use_container_width=True):
                 if txt:
                     enviar_mensagem_vrs(db, destinatario, txt, st.session_state.get('vrs_produto_atual', 'Geral'))
                     st.rerun()
     else:
-        st.caption("ℹ️ Selecione um produto na Vitrine e clique em 'Tenho Interesse' para conversar.")
+        st.info("ℹ️ Selecione um produto na Vitrine e clique em 'Tenho Interesse' para começar a negociar.")
 
 def enviar_mensagem_vrs(db, destinatario_email, texto, produto_nome="Geral"):
     """Grava os dados da mensagem no Firestore."""
+    if 'usuario' not in st.session_state: return
+    
     email_logado = st.session_state['usuario']['email']
     nome_logado = st.session_state['usuario']['nome']
+    
     db.collection("mensagens_chat").add({
         "texto": texto, 
         "remetente_email": email_logado, 
