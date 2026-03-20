@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS
-# JÁ VENDEU? - GESTÃO DE CHAT TURBO (COM NOTIFICAÇÃO SONORA E SELETOR)
+# JÁ VENDEU? - GESTÃO DE CHAT TURBO (CAMPANHA, SELETOR E EXCLUSÃO)
 # MÓDULO: chat.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
@@ -22,7 +22,7 @@ def tocar_campainha_vrs():
     )
 
 def exibir_interface_chat(db):
-    """Renderiza a interface completa de chat com lista de contatos e alerta sonoro."""
+    """Renderiza a interface completa de chat com lista de contatos, alerta e exclusão."""
     if 'usuario' not in st.session_state or st.session_state['usuario'] is None:
         st.warning("⚠️ Por favor, faça login para acessar suas conversas.")
         return
@@ -43,7 +43,6 @@ def exibir_interface_chat(db):
         }
         .info-msg { font-size: 0.7rem; color: #aaa; margin-top: 5px; display: block; }
         
-        /* Indicador Online */
         .status-online {
             color: #00FF00; font-size: 12px; font-weight: bold;
             display: flex; align-items: center; gap: 5px;
@@ -69,21 +68,23 @@ def exibir_interface_chat(db):
                      .order_by("timestamp", direction="ASCENDING")\
                      .stream()
         
-        lista_geral = [m.to_dict() for m in msgs_ref]
+        lista_geral = []
+        for m in msgs_ref:
+            d = m.to_dict()
+            d['id'] = m.id # Guarda o ID do documento para exclusão
+            lista_geral.append(d)
 
-        # --- LÓGICA DA CAMPAINHA (NOTIFICAÇÃO) ---
+        # --- LÓGICA DA CAMPAINHA ---
         if 'vrs_total_msgs' not in st.session_state:
             st.session_state['vrs_total_msgs'] = len(lista_geral)
         
-        # Se o número de mensagens cresceu
         if len(lista_geral) > st.session_state['vrs_total_msgs']:
-            # Só toca se a última mensagem NÃO for do usuário logado
             if lista_geral[-1]['remetente_email'] != email_logado:
                 tocar_campainha_vrs()
             st.session_state['vrs_total_msgs'] = len(lista_geral)
 
         if not lista_geral:
-            st.info("👋 Nenhuma conversa ainda. Seus chats aparecerão aqui assim que alguém tiver interesse nos seus produtos!")
+            st.info("👋 Nenhuma conversa ainda. Seus chats aparecerão aqui assim que alguém tiver interesse!")
             return
 
         # 2. SEPARA OS CONTATOS
@@ -95,19 +96,36 @@ def exibir_interface_chat(db):
             elif outro_email not in contatos:
                 contatos[outro_email] = "Interessado"
 
-        # 3. LAYOUT DE DUAS COLUNAS
-        col_contatos, col_conversa = st.columns([1, 2.5])
+        # 3. LAYOUT DE DUAS COLUNAS (LISTA À ESQUERDA | CHAT À DIREITA)
+        col_contatos, col_conversa = st.columns([1.2, 2.5])
 
         with col_contatos:
             st.markdown("### 👥 Contatos")
             for c_email, c_nome in contatos.items():
-                if st.button(f"👤 {c_nome}\n({c_email})", key=f"btn_{c_email}", use_container_width=True):
-                    st.session_state['vrs_chat_ativo'] = c_email
-                    st.session_state['vrs_nome_ativo'] = c_nome
-                    st.rerun()
+                # Container para cada contato com botão de exclusão
+                with st.container(border=True):
+                    c_btn, c_del = st.columns([4, 1])
+                    if c_btn.button(f"👤 {c_nome}\n({c_email})", key=f"btn_{c_email}", use_container_width=True):
+                        st.session_state['vrs_chat_ativo'] = c_email
+                        st.session_state['vrs_nome_ativo'] = c_nome
+                        st.rerun()
+                    
+                    # BOTÃO DE EXCLUIR CONTATO (LIXEIRA)
+                    if c_del.button("🗑️", key=f"del_{c_email}", help=f"Excluir conversa com {c_nome}"):
+                        # Deleta todas as mensagens trocadas com este contato
+                        for m in lista_geral:
+                            if c_email in m['envolvidos']:
+                                db.collection("mensagens_chat").document(m['id']).delete()
+                        
+                        # Se o contato excluído era o ativo, limpa a conversa da tela
+                        if st.session_state.get('vrs_chat_ativo') == c_email:
+                            st.session_state['vrs_chat_ativo'] = None
+                        
+                        st.success("Conversa excluída!")
+                        st.rerun()
 
         with col_conversa:
-            if 'vrs_chat_ativo' in st.session_state:
+            if 'vrs_chat_ativo' in st.session_state and st.session_state['vrs_chat_ativo']:
                 destinatario = st.session_state['vrs_chat_ativo']
                 st.markdown(f"#### 🗨️ Conversa com {st.session_state.get('vrs_nome_ativo', destinatario)}")
                 
@@ -125,7 +143,6 @@ def exibir_interface_chat(db):
                                 </div>
                             """, unsafe_allow_html=True)
 
-                # CAMPO DE RESPOSTA
                 with st.form("form_resposta_vrs", clear_on_submit=True):
                     c_input, c_send = st.columns([8, 2])
                     msg_txt = c_input.text_input("Sua resposta...", placeholder="Digite aqui...")
