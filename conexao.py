@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: conexao.py (VERSÃO SUPREMA DE AUTO-REPARO)
+# MÓDULO: conexao.py (VERSÃO FINAL ABSOLUTA - ANTI-ERRO)
 # =================================================================
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -12,17 +12,19 @@ def conectar_banco_vrs():
             if "firebase" in st.secrets:
                 creds_dict = dict(st.secrets["firebase"])
                 
-                # --- LIMPEZA DE ELITE DA IARA ---
-                if "private_key" in creds_dict:
-                    pk = creds_dict["private_key"]
-                    # Troca o texto '\n' por quebra real e limpa espaços
-                    pk = pk.replace("\\n", "\n").strip()
-                    # Garante que as bordas do certificado estejam perfeitas
-                    if not pk.startswith("-----BEGIN PRIVATE KEY-----"):
-                        pk = "-----BEGIN PRIVATE KEY-----\n" + pk
-                    if not pk.endswith("-----END PRIVATE KEY-----"):
-                        pk = pk + "\n-----END PRIVATE KEY-----"
-                    creds_dict["private_key"] = pk
+                # A MÁGICA DA IARA: Reconstrói a chave perfeitamente
+                pk = creds_dict["private_key"]
+                
+                # Remove qualquer tipo de lixo que o Streamlit inseriu
+                pk = pk.replace("\\n", "\n").replace('"', '').replace("'", "").strip()
+                
+                # Garante o cabeçalho e rodapé oficiais
+                if "-----BEGIN PRIVATE KEY-----" not in pk:
+                    pk = "-----BEGIN PRIVATE KEY-----\n" + pk
+                if "-----END PRIVATE KEY-----" not in pk:
+                    pk = pk + "\n-----END PRIVATE KEY-----"
+                
+                creds_dict["private_key"] = pk
                 
                 cred = credentials.Certificate(creds_dict)
                 firebase_admin.initialize_app(cred)
