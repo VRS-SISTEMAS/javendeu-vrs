@@ -9,6 +9,9 @@ import base64
 import datetime
 import categorias
 
+# Constante de Estados para uso global no sistema
+ESTADOS_BR = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+
 def exibir_painel_vendedor(db):
     """Interface para gerenciar anúncios do usuário logado com localização."""
     if not st.session_state.get('logado'):
@@ -63,13 +66,12 @@ def exibir_painel_vendedor(db):
                 idx_cat = lista_cats.index(dados_atuais['categoria']) if modo_edicao and dados_atuais.get('categoria') in lista_cats else 0
                 cat = col_c.selectbox("Categoria*", lista_cats, index=idx_cat)
 
-                # --- NOVIDADE: CAMPOS DE LOCALIZAÇÃO ---
+                # --- LOCALIZAÇÃO ---
                 st.markdown("📍 **Localização do Produto**")
                 col_est, col_cid = st.columns(2)
                 
-                estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
-                idx_est = estados_br.index(dados_atuais['estado']) if modo_edicao and dados_atuais.get('estado') in estados_br else 18 # Default RJ
-                est = col_est.selectbox("Estado*", estados_br, index=idx_est)
+                idx_est = ESTADOS_BR.index(dados_atuais['estado']) if modo_edicao and dados_atuais.get('estado') in ESTADOS_BR else 18 # Default RJ
+                est = col_est.selectbox("Estado*", ESTADOS_BR, index=idx_est)
                 cid = col_cid.text_input("Cidade*", value=dados_atuais.get('cidade', "Duque de Caxias"))
                 
                 f_arquivos = st.file_uploader("Fotos (Selecione até 3)*", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
@@ -88,7 +90,7 @@ def exibir_painel_vendedor(db):
                                 
                                 dados_post = {
                                     "titulo": t, "descricao": desc, "preco": p, "categoria": cat,
-                                    "estado": est, "cidade": cid, # Novos campos
+                                    "estado": est, "cidade": cid.strip().title(),
                                     "fotos": lista_fotos_b64, "status": "ativo", "vendedor_email": email_user,
                                     "vendedor_nome": st.session_state['usuario']['nome'],
                                     "data_publicacao": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -97,7 +99,7 @@ def exibir_painel_vendedor(db):
                             if modo_edicao:
                                 dados_post = {
                                     "titulo": t, "descricao": desc, "preco": p, "categoria": cat,
-                                    "estado": est, "cidade": cid
+                                    "estado": est, "cidade": cid.strip().title()
                                 }
                             else:
                                 st.error("⚠️ Envie ao menos 1 foto para novos anúncios.")

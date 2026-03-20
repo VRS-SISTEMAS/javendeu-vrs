@@ -1,7 +1,7 @@
 # =================================================================
 # VRS SISTEMAS
 # JÁ VENDEU? - MÓDULO: principal.py
-# FUNÇÕES: VITRINE E DETALHES (CARROSSEL FIXO ESTILO OLX + LOCALIZAÇÃO)
+# FUNÇÕES: VITRINE E DETALHES (FILTROS DE LOCALIZAÇÃO INTEGRADOS)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -83,7 +83,6 @@ if st.session_state['anuncio_detalhe']:
     with col_info:
         with st.container(border=True):
             st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {item.get('preco', 0.0):.2f}</h1>", unsafe_allow_html=True)
-            # EXIBIÇÃO DA LOCALIZAÇÃO NOS DETALHES
             st.markdown(f"📍 **{item.get('cidade', 'N/A')} - {item.get('estado', 'N/A')}**")
             st.markdown(f"**📁 Categoria:** {item.get('categoria', 'Geral')}")
             st.markdown("---")
@@ -112,16 +111,35 @@ else:
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
         interface_javendeu_vrs.exibir_conversor_vrs()
         st.markdown("---")
+        
+        # --- BARRA DE BUSCA E FILTROS INTELIGENTES ---
         st.subheader("🛍️ Vitrine de Ofertas")
-        cat_filtro = st.selectbox("O que você procura?", ["Todas"] + categorias.obter_categorias_vrs())
+        f_col1, f_col2, f_col3 = st.columns([2, 1, 2])
+        
+        cat_filtro = f_col1.selectbox("O que você procura?", ["Todas"] + categorias.obter_categorias_vrs())
+        est_filtro = f_col2.selectbox("Estado", ["Brasil"] + anuncios_vrs.ESTADOS_BR)
+        cid_filtro = f_col3.text_input("Cidade (opcional)", placeholder="Ex: Duque de Caxias").strip().title()
+
         try:
             if db:
                 query = db.collection("anuncios").where("status", "==", "ativo")
-                if cat_filtro != "Todas": query = query.where("categoria", "==", cat_filtro)
+                
+                # Filtros aplicados no código (devido a limitações de índices do Firebase)
                 docs = query.stream()
-                lista_anuncios = [d.to_dict() | {"id": d.id} for d in docs if 'titulo' in d.to_dict()]
+                lista_anuncios = []
+                
+                for d in docs:
+                    item = d.to_dict()
+                    # Aplicando lógica de filtro
+                    match_cat = (cat_filtro == "Todas" or item.get('categoria') == cat_filtro)
+                    match_est = (est_filtro == "Brasil" or item.get('estado') == est_filtro)
+                    match_cid = (not cid_filtro or cid_filtro in item.get('cidade', ''))
+                    
+                    if match_cat and match_est and match_cid:
+                        lista_anuncios.append(item | {"id": d.id})
+
                 if not lista_anuncios:
-                    st.warning("🧐 Nenhuma oferta encontrada.")
+                    st.warning("🧐 Nenhuma oferta encontrada para os filtros selecionados.")
                 else:
                     cols_vitrine = st.columns(4)
                     for idx, anuncio in enumerate(lista_anuncios):
@@ -132,13 +150,13 @@ else:
                                     st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
                                 st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
                                 st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
-                                # EXIBIÇÃO DA LOCALIZAÇÃO NA VITRINE
                                 st.caption(f"📍 {anuncio.get('cidade', 'N/A')} ({anuncio.get('estado', 'N/A')})")
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
         except Exception as e:
             st.error(f"Erro na vitrine: {e}")
+            
     elif pag in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
     elif pag == "Chat":
