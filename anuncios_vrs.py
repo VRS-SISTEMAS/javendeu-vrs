@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: anuncios_vrs.py (VERSÃO BLINDADA COM NOME CURTO)
+# MÓDULO: anuncios_vrs.py (VERSÃO CORRIGIDA - VISUAL ORIGINAL)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -32,7 +32,7 @@ def registrar_denuncia_vrs(db, anuncio_id, anuncio_titulo):
         st.toast("Denúncia enviada à VRS Soluções!", icon="🛡️")
 
 def exibir_painel_vendedor(db):
-    """Gestão de anúncios com salvamento de WhatsApp e Nome."""
+    """Interface de gestão com o visual original VRS."""
     if not st.session_state.get('logado'):
         st.warning("⚠️ Faça login primeiro.")
         return
@@ -40,10 +40,13 @@ def exibir_painel_vendedor(db):
     email_user = st.session_state['usuario']['email']
     st.markdown("<h1 style='text-align: center;'>📂 Gestão de Anúncios VRS</h1>", unsafe_allow_html=True)
 
-    if st.button("➕ NOVO ANÚNCIO", type="primary"):
-        st.session_state['vrs_novo_post'] = True
-        st.session_state['vrs_editando_id'] = None 
+    c1, c2, c3 = st.columns([1, 1, 1])
+    with c2:
+        if st.button("➕ NOVO ANÚNCIO", use_container_width=True, type="primary"):
+            st.session_state['vrs_novo_post'] = True
+            st.session_state['vrs_editando_id'] = None 
 
+    # LÓGICA DE CADASTRO/EDIÇÃO (MANTIDA)
     if st.session_state.get('vrs_novo_post') or st.session_state.get('vrs_editando_id'):
         modo_e = st.session_state.get('vrs_editando_id') is not None
         with st.form("form_vrs_anuncio"):
@@ -62,7 +65,6 @@ def exibir_painel_vendedor(db):
             if st.form_submit_button("🚀 PUBLICAR"):
                 if t and p > 0:
                     lista_f = [base64.b64encode(a.getvalue()).decode('utf-8') for a in f_arq[:3]]
-                    # SALVA O NOME COMPLETO E WHATSAPP PARA USO NO PRINCIPAL
                     dados = {
                         "titulo": t, "descricao": desc, "preco": p, "categoria": cat,
                         "estado": est, "cidade": cid.strip().title(), "status": "ativo",
@@ -72,20 +74,26 @@ def exibir_painel_vendedor(db):
                         "data_publicacao": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
                     }
                     if lista_f: dados["fotos"] = lista_f
-                    
                     if modo_e: db.collection("anuncios").document(st.session_state['vrs_editando_id']).update(dados)
                     else: db.collection("anuncios").add(dados)
-                    
-                    st.success("Publicado!")
+                    st.success("✅ Sucesso!")
                     st.session_state['vrs_novo_post'] = False
                     st.rerun()
 
-    # Listagem simplificada
+    st.markdown("---")
+    # VOLTANDO AO VISUAL DE CARDS COM COLUNAS NA GESTÃO
     itens = db.collection("anuncios").where("vendedor_email", "==", email_user).stream()
     for doc in itens:
         it = doc.to_dict()
         with st.container(border=True):
-            st.write(f"**{it['titulo']}** - R$ {it['preco']:.2f} ({it['status']})")
-            if st.button("🗑️ Deletar", key=f"del_{doc.id}"):
-                db.collection("anuncios").document(doc.id).delete()
-                st.rerun()
+            ci, ct, cb = st.columns([1, 3, 1.2]) # Estrutura original de 3 colunas por card
+            with ci:
+                if it.get('fotos'): st.image(f"data:image/jpeg;base64,{it['fotos'][0]}", use_container_width=True)
+            with ct:
+                st.subheader(it.get('titulo', 'Sem Título'))
+                st.write(f"**R$ {it.get('preco', 0):.2f}**")
+                st.caption(f"📍 {it.get('cidade')} - {it.get('estado')} | {it.get('status').upper()}")
+            with cb:
+                if st.button("🗑️ EXCLUIR", key=f"del_{doc.id}", use_container_width=True):
+                    db.collection("anuncios").document(doc.id).delete()
+                    st.rerun()
