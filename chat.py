@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS
-# JÁ VENDEU? - GESTÃO DE CHAT TURBO (CAMPANHA, SELETOR E EXCLUSÃO)
+# JÁ VENDEU? - GESTÃO DE CHAT TURBO (VERSÃO INTEGRADA ANTI-F5)
 # MÓDULO: chat.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
@@ -9,7 +9,7 @@ import datetime
 import streamlit.components.v1 as components
 
 def tocar_campainha_vrs():
-    """Injeta JavaScript para tocar som de notificação."""
+    """Injeta JavaScript para tocar som de notificação quando houver nova mensagem."""
     # Som de alerta profissional (Ping)
     audio_url = "https://www.soundjay.com/buttons/beep-07a.mp3"
     components.html(
@@ -22,14 +22,18 @@ def tocar_campainha_vrs():
     )
 
 def exibir_interface_chat(db):
-    """Renderiza a interface completa de chat com lista de contatos, alerta e exclusão."""
+    """Renderiza a interface completa de chat com lista de contatos e lógica de sessão VRS."""
+    
+    # Verifica se o usuário está logado na nova estrutura de memória
     if 'usuario' not in st.session_state or st.session_state['usuario'] is None:
-        st.warning("⚠️ Por favor, faça login para acessar suas conversas.")
+        st.warning("⚠️ Por favor, acesse sua conta para ver suas negociações.")
         return
 
     email_logado = st.session_state['usuario']['email']
+    # Pega apenas o primeiro nome para a interface
+    nome_logado_curto = st.session_state['usuario']['nome'].split()[0].title()
 
-    # --- ESTILIZAÇÃO AVANÇADA IARA ---
+    # --- ESTILIZAÇÃO AVANÇADA VRS ---
     st.markdown("""
         <style>
         .chat-vrs-bubble { display: flex; flex-direction: column; margin-bottom: 15px; width: 100%; }
@@ -54,12 +58,12 @@ def exibir_interface_chat(db):
         </style>
     """, unsafe_allow_html=True)
 
-    # CABEÇALHO COM STATUS ONLINE
+    # CABEÇALHO
     col_tit, col_status = st.columns([3, 1])
     with col_tit:
-        st.markdown("<h2 style='color: #FF4B4B; margin:0;'>💬 NEGOCIAÇÕES</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color: #FF4B4B; margin:0;'>💬 NEGOCIAÇÕES - {nome_logado_curto.upper()}</h2>", unsafe_allow_html=True)
     with col_status:
-        st.markdown(f'<div class="status-online"><span class="ponto-verde"></span> ONLINE AGORA</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="status-online"><span class="ponto-verde"></span> ONLINE</div>', unsafe_allow_html=True)
 
     try:
         # 1. BUSCA TODAS AS MENSAGENS ONDE O USUÁRIO ESTÁ ENVOLVIDO
@@ -87,15 +91,15 @@ def exibir_interface_chat(db):
             st.info("👋 Nenhuma conversa ainda. Seus chats aparecerão aqui assim que alguém tiver interesse!")
             return
 
-        # 2. SEPARA OS CONTATOS
+        # 2. SEPARA OS CONTATOS (USANDO APENAS PRIMEIRO NOME)
         contatos = {}
         for m in lista_geral:
-            # Pega o outro envolvido (que não seja o logado)
             outros = [e for e in m['envolvidos'] if e != email_logado]
             if outros:
                 outro_email = outros[0]
                 if m['remetente_email'] != email_logado:
-                    contatos[outro_email] = m['remetente_nome']
+                    # Salva apenas o primeiro nome do contato
+                    contatos[outro_email] = m['remetente_nome'].split()[0].title()
                 elif outro_email not in contatos:
                     contatos[outro_email] = "Interessado"
 
@@ -107,7 +111,7 @@ def exibir_interface_chat(db):
             for c_email, c_nome in contatos.items():
                 with st.container(border=True):
                     c_btn, c_del = st.columns([4, 1])
-                    if c_btn.button(f"👤 {c_nome}\n({c_email})", key=f"btn_{c_email}", use_container_width=True):
+                    if c_btn.button(f"👤 {c_nome.upper()}\n({c_email})", key=f"btn_{c_email}", use_container_width=True):
                         st.session_state['vrs_chat_ativo'] = c_email
                         st.session_state['vrs_nome_ativo'] = c_nome
                         st.rerun()
@@ -126,10 +130,8 @@ def exibir_interface_chat(db):
                 destinatario = st.session_state['vrs_chat_ativo']
                 st.markdown(f"#### 🗨️ Conversa com {st.session_state.get('vrs_nome_ativo', destinatario)}")
                 
-                # --- TRAVA DE SEGURANÇA NO MÓDULO CHAT ---
                 if destinatario == email_logado:
                     st.error("🚫 Ops! Você não pode conversar consigo mesmo.")
-                    st.info("💡 Use o painel 'Meus Anúncios' para gerenciar seus produtos.")
                 else:
                     with st.container(height=450, border=True):
                         for msg in lista_geral:
@@ -150,7 +152,9 @@ def exibir_interface_chat(db):
                         msg_txt = c_input.text_input("Sua resposta...", placeholder="Digite aqui...")
                         if c_send.form_submit_button("ENVIAR 🚀", use_container_width=True):
                             if msg_txt:
-                                enviar_mensagem_vrs(db, destinatario, msg_txt, "Resposta Direta")
+                                # Pega o nome do produto atual se estiver vindo da vitrine
+                                ref_produto = st.session_state.get('vrs_produto_atual', 'Resposta Direta')
+                                enviar_mensagem_vrs(db, destinatario, msg_txt, ref_produto)
                                 st.rerun()
             else:
                 st.markdown("<div style='text-align: center; margin-top: 100px; color: #666;'><h3>⬅️ Selecione um contato</h3></div>", unsafe_allow_html=True)
@@ -160,10 +164,12 @@ def exibir_interface_chat(db):
         st.caption(f"Log: {e}")
 
 def enviar_mensagem_vrs(db, destinatario_email, texto, produto_nome="Geral"):
-    """Grava a mensagem garantindo os campos da VRS SISTEMAS."""
-    if 'usuario' not in st.session_state: return
+    """Grava a mensagem garantindo os campos da VRS SISTEMAS e a sessão atual."""
+    if 'usuario' not in st.session_state or st.session_state['usuario'] is None:
+        return
+        
     email_logado = st.session_state['usuario']['email']
-    if email_logado == destinatario_email: return # Proteção extra no banco
+    if email_logado == destinatario_email: return 
     
     nome_logado = st.session_state['usuario']['nome']
     db.collection("mensagens_chat").add({
