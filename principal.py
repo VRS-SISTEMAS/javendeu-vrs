@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: principal.py (VERSÃO RESTAURADA - VISUAL ORIGINAL)
+# MÓDULO: principal.py (VERSÃO BLINDADA CONTRA ERROS DE FOTO)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -49,11 +49,15 @@ if st.session_state['anuncio_detalhe']:
     st.markdown(f"## {item.get('titulo')}")
     col_img, col_info = st.columns([1.5, 1])
     with col_img:
+        # Blindagem na galeria de detalhes
         fotos = item.get('fotos', [])
         if fotos:
             tabs = st.tabs([f"FOTO {i+1}" for i in range(len(fotos))])
             for i, f_b64 in enumerate(fotos):
                 with tabs[i]: st.markdown(f'<div class="moldura-foto-vrs"><img src="data:image/jpeg;base64,{f_b64}"></div>', unsafe_allow_html=True)
+        else:
+            st.info("📷 Este anúncio não possui fotos.")
+
     with col_info:
         with st.container(border=True):
             st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {item.get('preco', 0.0):.2f}</h1>", unsafe_allow_html=True)
@@ -65,14 +69,13 @@ if st.session_state['anuncio_detalhe']:
                 st.session_state['anuncio_detalhe'] = None
                 st.rerun()
 
-# --- VITRINE HOME (RESTAURADA COM FILTROS) ---
+# --- VITRINE HOME (CORRIGIDA E BLINDADA) ---
 else:
     if st.session_state['pagina_vrs'] == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
         interface_javendeu_vrs.exibir_conversor_vrs()
         st.markdown("---")
         
-        # RESTAURAÇÃO DA BARRA DE FILTROS
         st.subheader("🛍️ Vitrine de Ofertas")
         f1, f2, f3 = st.columns([2, 1, 2])
         cat_f = f1.selectbox("O que você procura?", ["Todas"] + categorias.obter_categorias_vrs())
@@ -85,7 +88,6 @@ else:
                 lista_anuncios = []
                 for d in docs:
                     it = d.to_dict()
-                    # APLICANDO FILTROS NOVAMENTE
                     if (cat_f == "Todas" or it.get('categoria') == cat_f) and \
                        (est_f == "Brasil" or it.get('estado') == est_f) and \
                        (not cid_f or cid_f in it.get('cidade', '')):
@@ -94,19 +96,32 @@ else:
                 if not lista_anuncios:
                     st.warning("🧐 Nenhuma oferta encontrada.")
                 else:
-                    cols = st.columns(4) # Volta a ser 4 colunas organizadas
+                    cols = st.columns(4) 
                     for idx, anuncio in enumerate(lista_anuncios):
                         with cols[idx % 4]:
                             with st.container(border=True):
-                                f_capa = anuncio['fotos'][0] if anuncio.get('fotos') else ""
-                                if f_capa: st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
-                                st.markdown(f"**{anuncio.get('titulo')}**")
+                                # --- TRAVA ANTI-ERRO DE FOTO (VRS SECURITY) ---
+                                f_capa = ""
+                                if anuncio.get('fotos') and isinstance(anuncio['fotos'], list) and len(anuncio['fotos']) > 0:
+                                    f_capa = anuncio['fotos'][0]
+                                elif anuncio.get('foto'): # Caso tenha vindo do sistema antigo
+                                    f_capa = anuncio['foto']
+                                
+                                if f_capa: 
+                                    st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
+                                else:
+                                    # Caso o notebook não tenha foto, coloca um aviso visual
+                                    st.markdown("<div style='height:150px; background:#222; display:flex; align-items:center; justify-content:center; border-radius:5px;'>📷 Sem Foto</div>", unsafe_allow_html=True)
+                                
+                                st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
                                 st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
-                                st.caption(f"📍 {anuncio.get('cidade')}")
+                                st.caption(f"📍 {anuncio.get('cidade', 'N/A')}")
+                                
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
-        except: st.error("Erro ao carregar vitrine.")
+        except Exception as e: 
+            st.error(f"Erro ao carregar vitrine. Verifique os dados no banco.")
             
     elif st.session_state['pagina_vrs'] in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
