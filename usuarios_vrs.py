@@ -1,6 +1,6 @@
 # =================================================================
 # VRS Soluções
-# JÁ VENDEU? - GESTÃO DE ACESSO (COM PERSISTÊNCIA ANTI-F5)
+# JÁ VENDEU? - GESTÃO DE ACESSO (VERSÃO PERSISTENTE SEM BIBLIOTECAS)
 # MÓDULO: usuarios_vrs.py
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
@@ -21,10 +21,12 @@ def validar_whatsapp_vrs(numero):
 def gerenciar_acesso(db):
     """
     Controla o sistema de login e cadastro.
-    Salva o e-mail no navegador para evitar deslogar no F5.
+    Mantém o login ativo durante a sessão do navegador.
     """
+    # Garante que as chaves de sessão existam
     if 'logado' not in st.session_state:
         st.session_state['logado'] = False
+    if 'usuario' not in st.session_state:
         st.session_state['usuario'] = None
 
     if not st.session_state['logado']:
@@ -39,16 +41,9 @@ def gerenciar_acesso(db):
                     if db:
                         user_ref = db.collection("usuarios").document(e).get()
                         if user_ref.exists and user_ref.to_dict()['senha'] == criar_hash(s):
+                            # DEFINE LOGIN COMO VERDADEIRO
                             st.session_state['logado'] = True
                             st.session_state['usuario'] = user_ref.to_dict()
-                            
-                            # MÁQUINA DE MEMÓRIA: Salva o e-mail no navegador do cliente
-                            st.markdown(f"""
-                                <script>
-                                    localStorage.setItem('vrs_user_email', '{e}');
-                                </script>
-                            """, unsafe_allow_html=True)
-                            
                             st.rerun()
                         else:
                             st.error("E-mail ou senha incorretos.")
@@ -67,11 +62,12 @@ def gerenciar_acesso(db):
                             "nome": n, "email": em, "cpf": cpf, "whatsapp": zap,
                             "senha": criar_hash(se), "data_cadastro": datetime.datetime.now()
                         })
-                        st.success("Cadastrado! Agora faça login.")
+                        st.success("Cadastro realizado! Faça login.")
                     else:
                         st.error("Verifique os campos obrigatórios.")
 
     else:
+        # Interface logado - Exibe primeiro nome e botão sair
         nome_user = st.session_state['usuario']['nome'].split()[0].upper()
         with st.popover(f"✅ OLÁ, {nome_user}"):
             if st.button("📊 MEUS ANÚNCIOS", use_container_width=True):
@@ -79,12 +75,7 @@ def gerenciar_acesso(db):
                 st.rerun()
             st.markdown("---")
             if st.button("SAIR DA CONTA", use_container_width=True):
-                # LIMPA A MEMÓRIA: Remove o e-mail do navegador ao sair
-                st.markdown("""
-                    <script>
-                        localStorage.removeItem('vrs_user_email');
-                    </script>
-                """, unsafe_allow_html=True)
+                # Limpa tudo e desloga
                 st.session_state['logado'] = False
                 st.session_state['usuario'] = None
                 st.session_state['pagina_vrs'] = "Home"

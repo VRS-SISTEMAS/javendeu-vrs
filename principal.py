@@ -1,7 +1,7 @@
 # =================================================================
 # VRS SISTEMAS
-# JÁ VENDEU? - MÓDULO: principal.py (VERSÃO MEMÓRIA PERSISTENTE)
-# FUNÇÕES: VITRINE, DETALHES E LOGIN AUTOMÁTICO ANTI-F5
+# JÁ VENDEU? - MÓDULO: principal.py (VERSÃO ESTÁVEL ANTI-F5)
+# FUNÇÕES: VITRINE, DETALHES E RECUPERAÇÃO DE SESSÃO
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -18,32 +18,14 @@ import anuncios_vrs
 import categorias
 import chat 
 
-# Garante atualizações
+# Garante atualizações dos módulos em tempo real
 importlib.reload(usuarios_vrs)
 importlib.reload(anuncios_vrs)
 
 interface_javendeu_vrs.aplicar_estilo_vrs()
 db = conexao.conectar_banco_vrs()
 
-# --- TRAVA ANTI-F5: RECUPERAÇÃO AUTOMÁTICA DE LOGIN ---
-if 'logado' not in st.session_state:
-    st.session_state['logado'] = False
-
-# Script para ler o e-mail salvo no navegador e avisar o Streamlit
-if not st.session_state['logado']:
-    # Usamos um componente invisível para capturar o dado do navegador
-    from streamlit_javascript import st_javascript
-    email_salvo = st_javascript("localStorage.getItem('vrs_user_email');")
-    
-    if email_salvo and email_salvo != "null":
-        # Se achou um e-mail, reconecta no Firebase automaticamente
-        user_ref = db.collection("usuarios").document(email_salvo).get()
-        if user_ref.exists:
-            st.session_state['logado'] = True
-            st.session_state['usuario'] = user_ref.to_dict()
-            st.rerun()
-
-# CSS MESTRE
+# CSS MESTRE VRS (DESIGN E STATUS ONLINE)
 st.markdown("""
     <style>
     .moldura-foto-vrs {
@@ -57,9 +39,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Inicializa estados de navegação se não existirem
 if 'pagina_vrs' not in st.session_state: st.session_state['pagina_vrs'] = "Home"
 if 'anuncio_detalhe' not in st.session_state: st.session_state['anuncio_detalhe'] = None
 
+# Cabeçalho com sistema de Login (Gerencia a persistência internamente)
 col_vazia, col_login = st.columns([8, 2])
 with col_login:
     if db is not None:
@@ -67,7 +51,7 @@ with col_login:
 
 interface_javendeu_vrs.obter_menu_lateral_vrs()
 
-# --- RESTANTE DO CÓDIGO (DETALHES E VITRINE) ---
+# --- LÓGICA DE EXIBIÇÃO ---
 if st.session_state['anuncio_detalhe']:
     item = st.session_state['anuncio_detalhe']
     anuncios_vrs.exibir_alerta_seguranca_vrs()
@@ -108,7 +92,6 @@ else:
     if st.session_state['pagina_vrs'] == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
         st.markdown("---")
-        # Lógica da Vitrine continua aqui igual à anterior...
         try:
             docs = db.collection("anuncios").where("status", "==", "ativo").stream()
             lista = [d.to_dict() | {"id": d.id} for d in docs]
