@@ -1,12 +1,13 @@
 # =================================================================
 # VRS SISTEMAS
-# JÁ VENDEU? - MÓDULO: principal.py
-# FUNÇÕES: VITRINE E DETALHES (FILTROS DE LOCALIZAÇÃO INTEGRADOS)
+# JÁ VENDEU? - MÓDULO: principal.py (VERSÃO SEGURANÇA MÁXIMA)
+# FUNÇÕES: VITRINE, DETALHES, DENÚNCIAS E AVALIAÇÕES
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
 import importlib
 import base64
+import datetime
 
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", initial_sidebar_state="expanded")
 
@@ -17,13 +18,15 @@ import anuncios_vrs
 import categorias
 import chat 
 
+# Garante que as atualizações de segurança sejam carregadas
 importlib.reload(usuarios_vrs)
+importlib.reload(anuncios_vrs)
 importlib.reload(chat)
 
 interface_javendeu_vrs.aplicar_estilo_vrs()
 db = conexao.conectar_banco_vrs()
 
-# CSS MESTRE PARA TRAVAR O TAMANHO DAS FOTOS
+# CSS MESTRE PARA TRAVAR O TAMANHO DAS FOTOS E ESTILIZAR COMENTÁRIOS
 st.markdown("""
     <style>
     .moldura-foto-vrs {
@@ -41,12 +44,12 @@ st.markdown("""
         max-width: 100%;
         object-fit: contain;
     }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] {
-        height: 40px;
-        padding: 0 20px;
+    .caixa-comentario {
         background-color: #1A1C24;
-        border-radius: 5px 5px 0 0;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 4px solid #FF4B4B;
+        margin-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -61,9 +64,13 @@ with col_login:
 
 interface_javendeu_vrs.obter_menu_lateral_vrs()
 
-# --- LÓGICA DE EXIBIÇÃO ---
+# --- LÓGICA DE DETALHES DO PRODUTO (ONDE AS TRAVAS ATUAM) ---
 if st.session_state['anuncio_detalhe']:
     item = st.session_state['anuncio_detalhe']
+    
+    # 🛡️ TRAVA 1: EXIBIR ALERTA DE SEGURANÇA NO TOPO
+    anuncios_vrs.exibir_alerta_seguranca_vrs()
+    
     st.markdown(f"## {item.get('titulo', 'Produto')}")
     
     col_img, col_info = st.columns([1.5, 1])
@@ -85,12 +92,16 @@ if st.session_state['anuncio_detalhe']:
             st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {item.get('preco', 0.0):.2f}</h1>", unsafe_allow_html=True)
             st.markdown(f"📍 **{item.get('cidade', 'N/A')} - {item.get('estado', 'N/A')}**")
             st.markdown(f"**📁 Categoria:** {item.get('categoria', 'Geral')}")
+            st.markdown(f"👤 **Vendedor:** {item.get('vendedor_nome', 'Usuário VRS')}")
             st.markdown("---")
             st.write("**Descrição:**")
             st.write(item.get('descricao', 'Sem descrição.'))
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("💬 TENHO INTERESSE / ABRIR CHAT", key="btn_chat_detalhe", use_container_width=True, type="primary"):
+            # --- BOTÕES DE INTERAÇÃO SEGUROS ---
+            col_b1, col_b2 = st.columns(2)
+            
+            if col_b1.button("💬 CHAT INTERNO", use_container_width=True, type="primary"):
                 if st.session_state.get('logado'):
                     st.session_state['vrs_chat_ativo'] = item['vendedor_email']
                     st.session_state['vrs_produto_atual'] = item['titulo']
@@ -99,12 +110,70 @@ if st.session_state['anuncio_detalhe']:
                     st.session_state['anuncio_detalhe'] = None
                     st.rerun()
                 else:
-                    st.error("⚠️ Faça login para conversar.")
+                    st.error("⚠️ Faça login para usar o chat.")
+
+            # Botão de WhatsApp (Se houver número cadastrado)
+            zap_vendedor = item.get('vendedor_whatsapp', '')
+            if zap_vendedor:
+                link_zap = f"https://wa.me/55{zap_vendedor}?text=Olá! Vi seu anúncio '{item['titulo']}' no site Já Vendeu? e tenho interesse."
+                col_b2.link_button("🟢 WHATSAPP", link_zap, use_container_width=True)
+
+            st.markdown("---")
+            
+            # 🛡️ TRAVA 2: BOTÃO DE DENÚNCIA
+            if st.button("🚩 DENUNCIAR ESTE ANÚNCIO", use_container_width=True):
+                anuncios_vrs.registrar_denuncia_vrs(db, item.get('id', 'N/A'), item.get('titulo', 'N/A'))
+                st.warning("Denúncia enviada para a central VRS Soluções.")
 
             if st.button("⬅️ VOLTAR PARA A VITRINE", use_container_width=True):
                 st.session_state['anuncio_detalhe'] = None
                 st.rerun()
 
+    # --- SEÇÃO DE AVALIAÇÕES E COMENTÁRIOS (SUGESTÃO DO VITOR) ---
+    st.markdown("---")
+    st.subheader("⭐ Avaliações do Vendedor")
+    
+    col_av1, col_av2 = st.columns([2, 1])
+    
+    with col_av1:
+        # Busca avaliações no Firebase
+        id_anuncio = item.get('id', 'N/A')
+        comentarios = db.collection("avaliacoes").where("vendedor_email", "==", item['vendedor_email']).stream()
+        tem_comentario = False
+        for c in comentarios:
+            tem_comentario = True
+            dados_c = c.to_dict()
+            st.markdown(f"""
+                <div class="caixa-comentario">
+                    <b>{dados_c['nome_avaliador']}</b> - Nota: {'⭐' * int(dados_c['nota'])}<br>
+                    <small>{dados_c['data']}</small><br>
+                    {dados_c['texto']}
+                </div>
+            """, unsafe_allow_html=True)
+        if not tem_comentario:
+            st.info("Este vendedor ainda não recebeu avaliações. Seja o primeiro!")
+
+    with col_av2:
+        if st.session_state.get('logado'):
+            with st.form("form_avaliar_vrs"):
+                st.write("Deixe sua avaliação:")
+                nota = st.slider("Nota", 1, 5, 5)
+                coment_txt = st.text_area("Comentário", placeholder="Como foi sua experiência?")
+                if st.form_submit_button("ENVIAR AVALIAÇÃO"):
+                    if coment_txt:
+                        db.collection("avaliacoes").add({
+                            "vendedor_email": item['vendedor_email'],
+                            "nome_avaliador": st.session_state['usuario']['nome'],
+                            "nota": nota,
+                            "texto": coment_txt,
+                            "data": datetime.datetime.now().strftime("%d/%m/%Y")
+                        })
+                        st.success("Obrigado pela avaliação!")
+                        st.rerun()
+        else:
+            st.caption("Faça login para avaliar este vendedor.")
+
+# --- LÓGICA DA HOME / VITRINE ---
 else:
     pag = st.session_state['pagina_vrs']
     if pag == "Home":
@@ -112,7 +181,6 @@ else:
         interface_javendeu_vrs.exibir_conversor_vrs()
         st.markdown("---")
         
-        # --- BARRA DE BUSCA E FILTROS INTELIGENTES ---
         st.subheader("🛍️ Vitrine de Ofertas")
         f_col1, f_col2, f_col3 = st.columns([2, 1, 2])
         
@@ -123,20 +191,17 @@ else:
         try:
             if db:
                 query = db.collection("anuncios").where("status", "==", "ativo")
-                
-                # Filtros aplicados no código (devido a limitações de índices do Firebase)
                 docs = query.stream()
                 lista_anuncios = []
                 
                 for d in docs:
-                    item = d.to_dict()
-                    # Aplicando lógica de filtro
-                    match_cat = (cat_filtro == "Todas" or item.get('categoria') == cat_filtro)
-                    match_est = (est_filtro == "Brasil" or item.get('estado') == est_filtro)
-                    match_cid = (not cid_filtro or cid_filtro in item.get('cidade', ''))
+                    it = d.to_dict()
+                    match_cat = (cat_filtro == "Todas" or it.get('categoria') == cat_filtro)
+                    match_est = (est_filtro == "Brasil" or it.get('estado') == est_filtro)
+                    match_cid = (not cid_filtro or cid_filtro in it.get('cidade', ''))
                     
                     if match_cat and match_est and match_cid:
-                        lista_anuncios.append(item | {"id": d.id})
+                        lista_anuncios.append(it | {"id": d.id})
 
                 if not lista_anuncios:
                     st.warning("🧐 Nenhuma oferta encontrada para os filtros selecionados.")
@@ -150,7 +215,7 @@ else:
                                     st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
                                 st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
                                 st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
-                                st.caption(f"📍 {anuncio.get('cidade', 'N/A')} ({anuncio.get('estado', 'N/A')})")
+                                st.caption(f"📍 {anuncio.get('cidade', 'N/A')}")
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
