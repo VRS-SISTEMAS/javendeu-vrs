@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: anuncios_vrs.py (VERSÃO CORRIGIDA - VISUAL ORIGINAL)
+# MÓDULO: anuncios_vrs.py (GESTÃO SEPARADA: ANUNCIAR VS MEUS ANÚNCIOS)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -32,68 +32,75 @@ def registrar_denuncia_vrs(db, anuncio_id, anuncio_titulo):
         st.toast("Denúncia enviada à VRS Soluções!", icon="🛡️")
 
 def exibir_painel_vendedor(db):
-    """Interface de gestão com o visual original VRS."""
+    """Interface que separa a criação de anúncios da gestão de anúncios existentes."""
     if not st.session_state.get('logado'):
         st.warning("⚠️ Faça login primeiro.")
         return
 
     email_user = st.session_state['usuario']['email']
-    st.markdown("<h1 style='text-align: center;'>📂 Gestão de Anúncios VRS</h1>", unsafe_allow_html=True)
+    pagina_atual = st.session_state.get('pagina_vrs')
 
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c2:
-        if st.button("➕ NOVO ANÚNCIO", use_container_width=True, type="primary"):
-            st.session_state['vrs_novo_post'] = True
-            st.session_state['vrs_editando_id'] = None 
-
-    # LÓGICA DE CADASTRO/EDIÇÃO (MANTIDA)
-    if st.session_state.get('vrs_novo_post') or st.session_state.get('vrs_editando_id'):
-        modo_e = st.session_state.get('vrs_editando_id') is not None
-        with st.form("form_vrs_anuncio"):
-            t = st.text_input("Título*", placeholder="Ex: Vendo Carro")
-            desc = st.text_area("Descrição*")
-            col_p, col_c = st.columns(2)
-            p = col_p.number_input("Preço (R$)*", min_value=0.0)
-            cat = col_c.selectbox("Categoria*", categorias.obter_categorias_vrs())
-            
-            st.markdown("📍 Localização")
-            col_e, col_ci = st.columns(2)
-            est = col_e.selectbox("Estado*", ESTADOS_BR, index=18)
-            cid = col_ci.text_input("Cidade*", value="Duque de Caxias")
-            f_arq = st.file_uploader("Fotos (Até 3)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
-
-            if st.form_submit_button("🚀 PUBLICAR"):
-                if t and p > 0:
-                    lista_f = [base64.b64encode(a.getvalue()).decode('utf-8') for a in f_arq[:3]]
-                    dados = {
-                        "titulo": t, "descricao": desc, "preco": p, "categoria": cat,
-                        "estado": est, "cidade": cid.strip().title(), "status": "ativo",
-                        "vendedor_email": email_user,
-                        "vendedor_nome": st.session_state['usuario']['nome'],
-                        "vendedor_whatsapp": st.session_state['usuario'].get('whatsapp', ''),
-                        "data_publicacao": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-                    }
-                    if lista_f: dados["fotos"] = lista_f
-                    if modo_e: db.collection("anuncios").document(st.session_state['vrs_editando_id']).update(dados)
-                    else: db.collection("anuncios").add(dados)
-                    st.success("✅ Sucesso!")
-                    st.session_state['vrs_novo_post'] = False
-                    st.rerun()
-
-    st.markdown("---")
-    # VOLTANDO AO VISUAL DE CARDS COM COLUNAS NA GESTÃO
-    itens = db.collection("anuncios").where("vendedor_email", "==", email_user).stream()
-    for doc in itens:
-        it = doc.to_dict()
+    # --- TELA 1: APENAS O FORMULÁRIO DE ANUNCIAR ---
+    if pagina_atual == "Anunciar":
+        st.markdown("<h1 style='text-align: center;'>➕ Novo Anúncio</h1>", unsafe_allow_html=True)
         with st.container(border=True):
-            ci, ct, cb = st.columns([1, 3, 1.2]) # Estrutura original de 3 colunas por card
-            with ci:
-                if it.get('fotos'): st.image(f"data:image/jpeg;base64,{it['fotos'][0]}", use_container_width=True)
-            with ct:
-                st.subheader(it.get('titulo', 'Sem Título'))
-                st.write(f"**R$ {it.get('preco', 0):.2f}**")
-                st.caption(f"📍 {it.get('cidade')} - {it.get('estado')} | {it.get('status').upper()}")
-            with cb:
-                if st.button("🗑️ EXCLUIR", key=f"del_{doc.id}", use_container_width=True):
-                    db.collection("anuncios").document(doc.id).delete()
-                    st.rerun()
+            with st.form("form_vrs_anunciar", clear_on_submit=True):
+                t = st.text_input("Título*", placeholder="Ex: Vendo Carro ou Serviço de Guincho")
+                desc = st.text_area("Descrição Detalhada*")
+                col_p, col_c = st.columns(2)
+                p = col_p.number_input("Preço (R$)*", min_value=0.0)
+                cat = col_c.selectbox("Categoria*", categorias.obter_categorias_vrs())
+                
+                st.markdown("📍 Localização")
+                col_e, col_ci = st.columns(2)
+                est = col_e.selectbox("Estado*", ESTADOS_BR, index=18)
+                cid = col_ci.text_input("Cidade*", value="Duque de Caxias")
+                f_arq = st.file_uploader("Fotos (Até 3)", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+
+                if st.form_submit_button("🚀 PUBLICAR AGORA"):
+                    if t and p > 0:
+                        lista_f = [base64.b64encode(a.getvalue()).decode('utf-8') for a in f_arq[:3]]
+                        dados = {
+                            "titulo": t, "descricao": desc, "preco": p, "categoria": cat,
+                            "estado": est, "cidade": cid.strip().title(), "status": "ativo",
+                            "vendedor_email": email_user,
+                            "vendedor_nome": st.session_state['usuario']['nome'],
+                            "vendedor_whatsapp": st.session_state['usuario'].get('whatsapp', ''),
+                            "data_publicacao": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                        }
+                        if lista_f: dados["fotos"] = lista_f
+                        db.collection("anuncios").add(dados)
+                        st.success("✅ Anúncio publicado com sucesso!")
+                        st.session_state['pagina_vrs'] = "Meus Anúncios" # Redireciona para gestão
+                        st.rerun()
+                    else:
+                        st.error("⚠️ Preencha o título e o preço.")
+
+    # --- TELA 2: APENAS A GESTÃO (MEUS ANÚNCIOS) ---
+    elif pagina_atual == "Meus Anúncios":
+        st.markdown("<h1 style='text-align: center;'>📂 Meus Anúncios Ativos</h1>", unsafe_allow_html=True)
+        
+        # Busca apenas os anúncios do usuário logado
+        itens = db.collection("anuncios").where("vendedor_email", "==", email_user).stream()
+        count = 0
+        for doc in itens:
+            count += 1
+            it = doc.to_dict()
+            with st.container(border=True):
+                ci, ct, cb = st.columns([1, 3, 1.2]) 
+                with ci:
+                    if it.get('fotos'): 
+                        st.image(f"data:image/jpeg;base64,{it['fotos'][0]}", use_container_width=True)
+                with ct:
+                    st.subheader(it.get('titulo', 'Sem Título'))
+                    st.markdown(f"<h3 style='color: #FF4B4B; margin:0;'>R$ {it.get('preco', 0):.2f}</h3>", unsafe_allow_html=True)
+                    st.caption(f"📍 {it.get('cidade')} - {it.get('estado')} | STATUS: {it.get('status').upper()}")
+                with cb:
+                    st.write("") # Espaçador
+                    if st.button("🗑️ EXCLUIR", key=f"del_{doc.id}", use_container_width=True):
+                        db.collection("anuncios").document(doc.id).delete()
+                        st.success("Removido!")
+                        st.rerun()
+        
+        if count == 0:
+            st.info("Você ainda não tem anúncios ativos. Clique em 'Anunciar' no menu lateral!")
