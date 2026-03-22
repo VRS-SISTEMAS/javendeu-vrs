@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: principal.py (VERSÃO BLINDADA CONTRA ERROS DE FOTO)
+# MÓDULO: principal.py (VERSÃO BLINDADA COM PAINEL ADMIN VITOR)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -16,9 +16,11 @@ import usuarios_vrs
 import anuncios_vrs
 import categorias
 import chat 
+import admin_vrs  # Novo módulo de gerenciamento exclusivo
 
 importlib.reload(usuarios_vrs)
 importlib.reload(anuncios_vrs)
+importlib.reload(admin_vrs)
 
 interface_javendeu_vrs.aplicar_estilo_vrs()
 db = conexao.conectar_banco_vrs()
@@ -40,7 +42,18 @@ col_vazia, col_login = st.columns([8, 2])
 with col_login:
     if db is not None: usuarios_vrs.gerenciar_acesso(db)
 
+# Menu Lateral Padrão
 interface_javendeu_vrs.obter_menu_lateral_vrs()
+
+# --- TRAVA DE SEGURANÇA MESTRE: MENU ADMIN EXCLUSIVO DO VITOR ---
+if st.session_state.get('logado') and st.session_state['usuario']['email'] == "vrsolucoes.sistemas@gmail.com":
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("<h3 style='color: #FF4B4B;'>🛠️ GESTÃO VRS</h3>", unsafe_allow_html=True)
+        if st.button("PAINEL ADMINISTRATIVO", key="btn_admin_vrs", use_container_width=True):
+            st.session_state['pagina_vrs'] = "Admin"
+            st.session_state['anuncio_detalhe'] = None
+            st.rerun()
 
 # --- DETALHES DO PRODUTO (MANTIDO) ---
 if st.session_state['anuncio_detalhe']:
@@ -49,7 +62,6 @@ if st.session_state['anuncio_detalhe']:
     st.markdown(f"## {item.get('titulo')}")
     col_img, col_info = st.columns([1.5, 1])
     with col_img:
-        # Blindagem na galeria de detalhes
         fotos = item.get('fotos', [])
         if fotos:
             tabs = st.tabs([f"FOTO {i+1}" for i in range(len(fotos))])
@@ -69,11 +81,10 @@ if st.session_state['anuncio_detalhe']:
                 st.session_state['anuncio_detalhe'] = None
                 st.rerun()
 
-# --- VITRINE HOME (CORRIGIDA E BLINDADA) ---
+# --- NAVEGAÇÃO DE PÁGINAS ---
 else:
     if st.session_state['pagina_vrs'] == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
-        # Removido exibir_conversor_vrs() para maior agilidade do usuário
         st.markdown("---")
         
         st.subheader("🛍️ Vitrine de Ofertas")
@@ -84,6 +95,7 @@ else:
 
         try:
             if db:
+                # Lógica de Vitrine: VIPs primeiro, depois os normais por data
                 docs = db.collection("anuncios").where("status", "==", "ativo").stream()
                 lista_anuncios = []
                 for d in docs:
@@ -93,24 +105,30 @@ else:
                        (not cid_f or cid_f in it.get('cidade', '')):
                         lista_anuncios.append(it | {"id": d.id})
 
+                # Ordenação manual: Quem é VIP fica no topo
+                lista_anuncios = sorted(lista_anuncios, key=lambda x: x.get('vip', False), reverse=True)
+
                 if not lista_anuncios:
                     st.warning("🧐 Nenhuma oferta encontrada.")
                 else:
                     cols = st.columns(4) 
                     for idx, anuncio in enumerate(lista_anuncios):
                         with cols[idx % 4]:
+                            # Estilo diferencial se for VIP
+                            border_style = "2px solid #FF4B4B" if anuncio.get('vip') else "1px solid #333"
                             with st.container(border=True):
-                                # --- TRAVA ANTI-ERRO DE FOTO (VRS SECURITY) ---
+                                if anuncio.get('vip'):
+                                    st.markdown("<span style='background:#FF4B4B; color:white; padding:2px 5px; border-radius:3px; font-size:10px;'>⭐ DESTAQUE</span>", unsafe_allow_html=True)
+                                
                                 f_capa = ""
-                                if anuncio.get('fotos') and isinstance(anuncio['fotos'], list) and len(anuncio['fotos']) > 0:
+                                if anuncio.get('fotos') and len(anuncio['fotos']) > 0:
                                     f_capa = anuncio['fotos'][0]
-                                elif anuncio.get('foto'): # Caso tenha vindo do sistema antigo
+                                elif anuncio.get('foto'):
                                     f_capa = anuncio['foto']
                                 
                                 if f_capa: 
                                     st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
                                 else:
-                                    # Caso o notebook não tenha foto, coloca um aviso visual
                                     st.markdown("<div style='height:150px; background:#222; display:flex; align-items:center; justify-content:center; border-radius:5px;'>📷 Sem Foto</div>", unsafe_allow_html=True)
                                 
                                 st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
@@ -121,10 +139,13 @@ else:
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
         except Exception as e: 
-            st.error(f"Erro ao carregar vitrine. Verifique os dados no banco.")
+            st.error(f"Erro ao carregar vitrine.")
             
     elif st.session_state['pagina_vrs'] in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
     elif st.session_state['pagina_vrs'] == "Chat":
         chat.exibir_interface_chat(db)
+    elif st.session_state['pagina_vrs'] == "Admin":
+        admin_vrs.exibir_painel_admin_vrs(db) # Página de gestão do Vitor
+
     interface_javendeu_vrs.exibir_rodape_vrs()
