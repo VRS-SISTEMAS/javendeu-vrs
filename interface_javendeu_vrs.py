@@ -90,19 +90,6 @@ def exibir_identidade_visual_vrs():
     st.markdown("<div class='banner-vrs'><h1 style='margin:0; color:white;'>ANUNCIE GRÁTIS E VENDA RÁPIDO</h1></div>", unsafe_allow_html=True)
     st.markdown(f"<div style='text-align: center; color: #CCCCCC; font-size: 22px; margin-top: 15px; margin-bottom: 40px;'>\"Onde o seu 'parado' vira oportunidade e o seu desejo vira realidade.\"</div>", unsafe_allow_html=True)
 
-def exibir_conversor_vrs():
-    """Link útil para o usuário redimensionar fotos."""
-    st.markdown("""
-        <div style='background-color: #1A1C24; padding: 20px; border-left: 5px solid #FF4B4B; border-radius: 4px; margin-bottom: 25px;'>
-            <strong style='color: #FF4B4B;'>📸 CONVERSOR DE FOTOS VRS:</strong><br>
-            <span style='color: #E0E0E0;'>Converta suas fotos para não dar problema no anúncio!</span><br><br>
-            <a href='https://www.iloveimg.com/pt/redimensionar-imagem' target='_blank' 
-               style='background-color: #FF4B4B; color: white; padding: 8px 15px; text-decoration: none; font-weight: bold; border-radius: 4px;'>
-               🔗 ACESSAR CONVERSOR
-            </a>
-        </div>
-    """, unsafe_allow_html=True)
-
 def exibir_rodape_vrs():
     """Rodapé com Termos de Uso e Regras de Segurança detalhadas."""
     st.markdown("---")

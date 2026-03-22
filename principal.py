@@ -73,7 +73,7 @@ if st.session_state['anuncio_detalhe']:
 else:
     if st.session_state['pagina_vrs'] == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
-        interface_javendeu_vrs.exibir_conversor_vrs()
+        # Removido exibir_conversor_vrs() para maior agilidade do usuário
         st.markdown("---")
         
         st.subheader("🛍️ Vitrine de Ofertas")
