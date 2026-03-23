@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE NACIONAL - CORRIGIDO)
+# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE NACIONAL - COM BANNERS)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -19,11 +19,13 @@ import anuncios_vrs
 import categorias
 import chat 
 import admin_vrs 
+import publicidade_clientes # Novo módulo de publicidade
 
 # Forçar recarregamento para aplicar alterações em tempo real
 importlib.reload(usuarios_vrs)
 importlib.reload(anuncios_vrs)
 importlib.reload(admin_vrs)
+importlib.reload(publicidade_clientes)
 
 # Aplicação da Identidade Visual VRS
 interface_javendeu_vrs.aplicar_estilo_vrs()
@@ -94,7 +96,6 @@ if st.session_state['anuncio_detalhe']:
             st.markdown(f"📍 **{item.get('cidade')} - {item.get('estado')}**")
             st.write(item.get('descricao'))
             
-            # Botão de Negociação (Encaminha para o Chat em tempo real)
             if st.button("💬 NEGOCIAR NO CHAT", use_container_width=True):
                 if not st.session_state.get('logado'):
                     st.warning("⚠️ Você precisa estar logado para negociar!")
@@ -125,26 +126,26 @@ else:
         est_f = f2.selectbox("Estado", ["Brasil"] + anuncios_vrs.ESTADOS_BR)
         cid_f = f3.text_input("Cidade (opcional)", placeholder="Ex: Duque de Caxias").strip().title()
 
+        # --- INTEGRAÇÃO DE PUBLICIDADE: Exibe o banner do cliente aqui ---
+        if db:
+            publicidade_clientes.exibir_banner_rotativo_vrs(db, estado_atual=est_f)
+
         try:
             if db:
-                # Busca ativa no Firestore
                 docs = db.collection("anuncios").where("status", "==", "ativo").stream()
                 lista_anuncios = []
                 for d in docs:
                     it = d.to_dict()
-                    # Lógica de Filtro Nacional (VRS Soluções)
                     if (cat_f == "Todas" or it.get('categoria') == cat_f) and \
                        (est_f == "Brasil" or it.get('estado') == est_f) and \
                        (not cid_f or cid_f in it.get('cidade', '')):
                         lista_anuncios.append(it | {"id": d.id})
 
-                # Ordenação: VIPs aparecem primeiro na vitrine
                 lista_anuncios = sorted(lista_anuncios, key=lambda x: x.get('vip', False), reverse=True)
 
                 if not lista_anuncios:
                     st.warning("🧐 Nenhuma oferta encontrada para esta região.")
                 else:
-                    # Exibição em Grid (4 colunas)
                     cols = st.columns(4) 
                     for idx, anuncio in enumerate(lista_anuncios):
                         with cols[idx % 4]:
@@ -161,7 +162,7 @@ else:
                                 st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
                                 st.markdown(f"<h4 style='color: #FF4B4B; margin-bottom: 0px;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
                                 
-                                # --- CORREÇÃO: Exibição da Localização no Card ---
+                                # Localização Corrigida
                                 st.caption(f"📍 {anuncio.get('cidade')} - {anuncio.get('estado')}")
                                 
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
@@ -177,5 +178,4 @@ else:
     elif st.session_state['pagina_vrs'] == "Admin":
         admin_vrs.exibir_painel_admin_vrs(db)
 
-    # Rodapé Padrão VRS
     interface_javendeu_vrs.exibir_rodape_vrs()

@@ -1,15 +1,16 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: admin_vrs.py (PAINEL DE CONTROLE TOTAL DO VITOR)
+# MÓDULO: admin_vrs.py (PAINEL DE CONTROLE TOTAL - COM PUBLICIDADE)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
 import datetime
+import publicidade_clientes # Importação do novo módulo
 
 def exibir_painel_admin_vrs(db):
     """
     Interface administrativa de alto nível.
-    Permite gerenciar anúncios, denúncias e usuários da rede VRS.
+    Permite gerenciar anúncios, usuários, denúncias e publicidade paga.
     """
     
     # --- TRAVA DE SEGURANÇA MESTRE (VRS SOLUÇÕES) ---
@@ -40,104 +41,72 @@ def exibir_painel_admin_vrs(db):
     st.markdown("---")
 
     # --- ABAS DE PODER ADMINISTRATIVO ---
-    tab_anuncios, tab_usuarios, tab_denuncias = st.tabs(["📢 MODERAR ANÚNCIOS", "👥 GERIR USUÁRIOS", "🛡️ DENÚNCIAS"])
+    tab_anuncios, tab_usuarios, tab_denuncias, tab_pub = st.tabs(["📢 MODERAR ANÚNCIOS", "👥 GERIR USUÁRIOS", "🛡️ DENÚNCIAS", "💰 PUBLICIDADE"])
 
-    # --- ABA 1: MODERAÇÃO DE ANÚNCIOS (Limpeza de "anúncios bobos") ---
+    # --- ABA 1: MODERAÇÃO DE ANÚNCIOS ---
     with tab_anuncios:
         st.subheader("Controle de Vitrine Nacional")
         busca_anuncio = st.text_input("🔍 Localizar anúncio (Título ou E-mail)", key="busca_adm_anuncio")
-        
         anuncios = db.collection("anuncios").order_by("data_publicacao", direction="DESCENDING").stream()
         
         for doc in anuncios:
             it = doc.to_dict()
-            anuncio_id = doc.id
-            vendedor = it.get('vendedor_email', '').lower()
-            titulo = it.get('titulo', '').lower()
-
-            # Filtro de busca para facilitar a vida do Vitor
-            if busca_anuncio.lower() in titulo or busca_anuncio.lower() in vendedor:
+            if busca_anuncio.lower() in it.get('titulo', '').lower() or busca_anuncio.lower() in it.get('vendedor_email', '').lower():
                 with st.container(border=True):
                     col_foto, col_txt, col_btns = st.columns([1, 3, 2])
-                    
                     with col_foto:
-                        if it.get('fotos'):
-                            st.image(f"data:image/jpeg;base64,{it['fotos'][0]}", use_container_width=True)
-                    
+                        if it.get('fotos'): st.image(f"data:image/jpeg;base64,{it['fotos'][0]}", use_container_width=True)
                     with col_txt:
                         st.markdown(f"**{it.get('titulo')}**")
                         st.caption(f"Vendedor: {it.get('vendedor_nome')} | {it.get('vendedor_email')}")
                         st.markdown(f"Preço: R$ {it.get('preco', 0.0):.2f}")
-                        if it.get('vip'): st.markdown("⭐ **DESTAQUE VIP ATIVO**")
-                    
                     with col_btns:
-                        # Gestão de Destaque
                         label_vip = "⚪ REMOVER VIP" if it.get('vip') else "⭐ DAR DESTAQUE"
-                        if st.button(label_vip, key=f"vip_{anuncio_id}", use_container_width=True):
-                            db.collection("anuncios").document(anuncio_id).update({"vip": not it.get('vip')})
+                        if st.button(label_vip, key=f"vip_{doc.id}", use_container_width=True):
+                            db.collection("anuncios").document(doc.id).update({"vip": not it.get('vip')})
+                            st.rerun()
+                        if st.button("🗑️ EXCLUIR", key=f"del_{doc.id}", use_container_width=True):
+                            db.collection("anuncios").document(doc.id).delete()
                             st.rerun()
 
-                        # Exclusão de anúncio bobo/indesejado
-                        if st.button("🗑️ EXCLUIR ANÚNCIO", key=f"del_anuncio_{anuncio_id}", use_container_width=True):
-                            db.collection("anuncios").document(anuncio_id).delete()
-                            st.success("Anúncio removido!")
-                            st.rerun()
-
-    # --- ABA 2: GESTÃO DE USUÁRIOS (Bloquear e Excluir) ---
+    # --- ABA 2: GESTÃO DE USUÁRIOS ---
     with tab_usuarios:
         st.subheader("Membros Cadastrados")
         users = db.collection("usuarios").stream()
-        
         for u_doc in users:
             u = u_doc.to_dict()
-            u_email = u.get('email')
-            u_status = u.get('status_conta', 'ativo')
-            
-            # Pula o administrador para evitar auto-bloqueio
-            if u_email == email_admin: continue
-
+            if u.get('email') == email_admin: continue
             with st.container(border=True):
                 inf, act, dlt = st.columns([2, 1, 1])
                 with inf:
                     st.markdown(f"👤 **{u.get('nome')}**")
-                    st.caption(f"E-mail: {u_email} | Zap: {u.get('whatsapp')}")
-                    cor_status = "red" if u_status == "bloqueado" else "#00FF00"
-                    st.markdown(f"Status: <span style='color:{cor_status};'>{u_status.upper()}</span>", unsafe_allow_html=True)
-                
+                    st.caption(f"E-mail: {u.get('email')} | Status: {u.get('status_conta', 'ativo').upper()}")
                 with act:
-                    # Alterna entre Bloquear e Desbloquear
-                    if u_status == "ativo":
-                        if st.button("🚫 BLOQUEAR", key=f"blk_{u_email}", use_container_width=True):
-                            db.collection("usuarios").document(u_email).update({"status_conta": "bloqueado"})
+                    if u.get('status_conta', 'ativo') == "ativo":
+                        if st.button("🚫 BLOQUEAR", key=f"blk_{u.get('email')}", use_container_width=True):
+                            db.collection("usuarios").document(u.get('email')).update({"status_conta": "bloqueado"})
                             st.rerun()
                     else:
-                        if st.button("✅ REATIVAR", key=f"act_{u_email}", use_container_width=True):
-                            db.collection("usuarios").document(u_email).update({"status_conta": "ativo"})
+                        if st.button("✅ REATIVAR", key=f"act_{u.get('email')}", use_container_width=True):
+                            db.collection("usuarios").document(u.get('email')).update({"status_conta": "ativo"})
                             st.rerun()
-                            
                 with dlt:
-                    # Exclusão permanente do usuário e seus rastros
-                    if st.button("💀 BANIR", key=f"ban_{u_email}", use_container_width=True):
-                        # Deleta o usuário
-                        db.collection("usuarios").document(u_email).delete()
-                        # Limpa os anúncios dele para não deixar lixo no site
-                        meus_anuncios = db.collection("anuncios").where("vendedor_email", "==", u_email).stream()
-                        for a in meus_anuncios:
-                            db.collection("anuncios").document(a.id).delete()
-                        st.error(f"Usuário {u_email} banido da rede VRS!")
+                    if st.button("💀 BANIR", key=f"ban_{u.get('email')}", use_container_width=True):
+                        db.collection("usuarios").document(u.get('email')).delete()
                         st.rerun()
 
     # --- ABA 3: DENÚNCIAS ---
     with tab_denuncias:
-        st.subheader("Alertas de Segurança Recebidos")
-        denuncias = db.collection("denuncias").order_by("data", direction="DESCENDING").stream()
-        
+        st.subheader("Alertas de Segurança")
+        denuncias = db.collection("denuncias").stream()
         for den in denuncias:
             d = den.to_dict()
             with st.container(border=True):
                 st.warning(f"🚨 Denúncia: {d.get('titulo')}")
-                st.write(f"Vendedor sob suspeita: {d.get('vendedor_email', 'Não informado')}")
-                st.caption(f"Reportado por: {d.get('denunciante')} em {d.get('data')}")
-                if st.button("OK, RESOLVIDO", key=f"den_ok_{den.id}"):
+                if st.button("RESOLVIDO", key=f"den_{den.id}"):
                     db.collection("denuncias").document(den.id).delete()
                     st.rerun()
+
+    # --- ABA 4: GESTÃO DE PUBLICIDADE (O NOVO PODER) ---
+    with tab_pub:
+        publicidade_clientes.gerenciar_banners_vrs(db)
