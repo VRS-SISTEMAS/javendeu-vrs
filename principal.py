@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE NACIONAL)
+# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE NACIONAL - CORRIGIDO)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -159,7 +159,11 @@ else:
                                     st.markdown("<div style='height:150px; background:#222; display:flex; align-items:center; justify-content:center; border-radius:5px;'>📷 Sem Foto</div>", unsafe_allow_html=True)
                                 
                                 st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
-                                st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
+                                st.markdown(f"<h4 style='color: #FF4B4B; margin-bottom: 0px;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
+                                
+                                # --- CORREÇÃO: Exibição da Localização no Card ---
+                                st.caption(f"📍 {anuncio.get('cidade')} - {anuncio.get('estado')}")
+                                
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
