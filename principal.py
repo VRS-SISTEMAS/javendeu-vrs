@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE - RESTAURAÇÃO TOTAL)
+# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE - VERSÃO BLINDADA)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -39,7 +39,6 @@ st.markdown("""
     .ponto-online { height: 10px; width: 10px; background-color: #00FF00; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 8px #00FF00; }
     .status-online-vrs { color: #00FF00; font-weight: bold; font-size: 14px; }
     
-    /* Botão de Negociação Destacado */
     div.stButton > button:first-child[aria-label="💬 NEGOCIAR NO CHAT"] {
         background-color: #FF4B4B !important;
         color: white !important;
@@ -76,7 +75,7 @@ if st.session_state.get('logado') and st.session_state['usuario']['email'] == "v
 if st.session_state['anuncio_detalhe']:
     # TELA DE DETALHES DO PRODUTO
     item = st.session_state['anuncio_detalhe']
-    st.markdown(f"## {item.get('titulo').upper()}")
+    st.markdown(f"## {item.get('titulo', 'ANÚNCIO').upper()}")
     col_img, col_info = st.columns([1.5, 1])
     
     with col_img:
@@ -88,10 +87,11 @@ if st.session_state['anuncio_detalhe']:
     
     with col_info:
         with st.container(border=True):
-            st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {item.get('preco', 0.0):.2f}</h1>", unsafe_allow_html=True)
+            preco = item.get('preco', 0.0)
+            st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {preco:.2f}</h1>", unsafe_allow_html=True)
             # LOCALIZAÇÃO NA TELA DE DETALHES
-            st.markdown(f"📍 **{item.get('cidade')} - {item.get('estado')}**")
-            st.write(item.get('descricao'))
+            st.markdown(f"📍 **{item.get('cidade', 'N/I')} - {item.get('estado', 'N/I')}**")
+            st.write(item.get('descricao', 'Sem descrição disponível.'))
             
             if st.button("⬅️ VOLTAR PARA VITRINE", use_container_width=True):
                 st.session_state['anuncio_detalhe'] = None
@@ -113,13 +113,14 @@ else:
         if db:
             publicidade_clientes.exibir_banner_rotativo_vrs(db, estado_atual=est_f)
 
-        # --- CARREGAMENTO DA VITRINE ---
+        # --- CARREGAMENTO DA VITRINE BLINDADA ---
         try:
             if db:
                 docs = db.collection("anuncios").where("status", "==", "ativo").stream()
                 lista_anuncios = []
                 for d in docs:
                     it = d.to_dict()
+                    # Filtro de busca
                     if (cat_f == "Todas" or it.get('categoria') == cat_f) and \
                        (est_f == "Brasil" or it.get('estado') == est_f) and \
                        (not cid_f or cid_f in it.get('cidade', '')):
@@ -132,22 +133,26 @@ else:
                     for idx, anuncio in enumerate(lista_anuncios):
                         with cols[idx % 4]:
                             with st.container(border=True):
-                                f_capa = anuncio['fotos'][0] if anuncio.get('fotos') else ""
+                                # Verificação segura de fotos
+                                fotos_list = anuncio.get('fotos', [])
+                                f_capa = fotos_list[0] if fotos_list else ""
                                 if f_capa: 
                                     st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
                                 
-                                st.markdown(f"**{anuncio.get('titulo')}**")
-                                st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {anuncio.get('preco', 0.0):.2f}</h4>", unsafe_allow_html=True)
+                                st.markdown(f"**{anuncio.get('titulo', 'Sem Título')}**")
+                                preco_card = anuncio.get('preco', 0.0)
+                                st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {preco_card:.2f}</h4>", unsafe_allow_html=True)
                                 
-                                # --- LOCALIZAÇÃO VOLTOU PARA OS CARDS ---
-                                st.caption(f"📍 {anuncio.get('cidade')} - {anuncio.get('estado')}")
+                                # LOCALIZAÇÃO NOS CARDS
+                                st.caption(f"📍 {anuncio.get('cidade', 'N/I')} - {anuncio.get('estado', 'N/I')}")
                                 
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
-        except: st.error("Erro ao carregar a vitrine VRS.")
+        except Exception as e: 
+            st.error("Erro ao carregar a vitrine. Verifique a conexão com o banco.")
 
-    # --- PÁGINAS QUE EU TINHA SUMIDO (RESTAURADAS!) ---
+    # --- PÁGINAS DE GESTÃO E CHAT ---
     elif st.session_state['pagina_vrs'] in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
     
