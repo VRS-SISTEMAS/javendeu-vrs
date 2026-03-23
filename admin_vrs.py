@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: admin_vrs.py (PAINEL MASTER COMPLETO)
+# MÓDULO: admin_vrs.py (PAINEL ADMINISTRATIVO MASTER)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -13,39 +13,38 @@ def exibir_painel_admin_vrs(db):
         st.error("🚫 ACESSO NEGADO.")
         return
 
-    st.markdown(f"<h1 style='color: #FF4B4B;'>🛠️ Painel Master - VRS SOLUÇÕES</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='color: #FF4B4B;'>🛠️ Gestão Master - VRS SOLUÇÕES</h1>", unsafe_allow_html=True)
     
-    # Métricas Reais
+    # Métricas Reais do Banco
     c1, c2, c3 = st.columns(3)
     try:
-        c1.metric("Anúncios", len(list(db.collection("anuncios").stream())))
-        c2.metric("Usuários", len(list(db.collection("usuarios").stream())))
+        c1.metric("Anúncios Ativos", len(list(db.collection("anuncios").stream())))
+        c2.metric("Membros", len(list(db.collection("usuarios").stream())))
         c3.metric("Denúncias", len(list(db.collection("denuncias").stream())))
     except: pass
 
-    tab_anuncios, tab_usuarios, tab_pub = st.tabs(["📢 ANÚNCIOS", "👥 USUÁRIOS", "💰 PUBLICIDADE"])
+    tab_anuncios, tab_usuarios, tab_pub = st.tabs(["📢 ANÚNCIOS", "👥 USUÁRIOS/BAN", "💰 PUBLICIDADE"])
 
     with tab_anuncios:
-        st.subheader("Gerenciar Vitrine")
-        # Lógica original de exclusão de anúncios aqui...
+        st.subheader("Moderar Vitrine")
         anuncios = db.collection("anuncios").stream()
         for doc in anuncios:
             it = doc.to_dict()
             with st.container(border=True):
-                st.write(f"**{it.get('titulo')}** - {it.get('vendedor_email')}")
-                if st.button("EXCLUIR", key=f"adm_del_{doc.id}"):
+                st.write(f"**{it.get('titulo')}** | Vendedor: {it.get('vendedor_email')}")
+                if st.button("🗑️ EXCLUIR", key=f"adm_del_{doc.id}"):
                     db.collection("anuncios").document(doc.id).delete()
                     st.rerun()
 
     with tab_usuarios:
-        st.subheader("Controle de Usuários")
+        st.subheader("Controle de Membros")
         users = db.collection("usuarios").stream()
         for u_doc in users:
             u = u_doc.to_dict()
             if u.get('email') == email_admin: continue
             with st.container(border=True):
-                st.write(f"👤 {u.get('nome')} ({u.get('email')})")
-                if st.button("BANIR", key=f"adm_ban_{u.get('email')}"):
+                st.write(f"👤 {u.get('nome')} | {u.get('email')}")
+                if st.button("💀 BANIR", key=f"adm_ban_{u.get('email')}"):
                     db.collection("usuarios").document(u.get('email')).delete()
                     st.rerun()
 
