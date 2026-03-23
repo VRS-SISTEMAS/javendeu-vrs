@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: publicidade_clientes.py (GESTÃO DE BANNERS)
+# MÓDULO: publicidade_clientes.py (GESTÃO DE BANNERS - CORRIGIDO)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -67,21 +67,28 @@ def gerenciar_banners_vrs(db):
 def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
     """Exibe o banner na Home baseado no filtro de estado."""
     try:
-        # Busca banners para o estado selecionado ou nacional
-        query = db.collection("publicidade").where("estado_alvo", "in", ["Brasil", estado_atual]).stream()
+        # Lógica corrigida: busca banners 'Brasil' OU o estado selecionado
+        # Isso garante que o banner apareça mesmo que o filtro mude
+        filtros_busca = ["Brasil"]
+        if estado_atual != "Brasil":
+            filtros_busca.append(estado_atual)
+
+        query = db.collection("publicidade").where("estado_alvo", "in", filtros_busca).stream()
         lista_banners = [b.to_dict() | {"id": b.id} for b in query]
         
         if lista_banners:
-            # Pega o último cadastrado
+            # Pega o banner mais recente cadastrado para dar rotatividade
             banner = lista_banners[-1] 
             
+            # HTML para tornar o banner clicável
             html_banner = f"""
                 <a href="{banner['link']}" target="_blank" style="text-decoration: none;">
-                    <div style="width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid #333; margin-bottom: 20px;">
+                    <div style="width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid #333; margin-bottom: 20px; box-shadow: 0px 4px 15px rgba(0,0,0,0.5);">
                         <img src="data:image/jpeg;base64,{banner['foto']}" style="width: 100%; display: block;">
                     </div>
                 </a>
             """
             st.markdown(html_banner, unsafe_allow_html=True)
-    except:
-        pass # Se der erro ou não tiver banner, não trava o site
+    except Exception as e:
+        # Se houver erro na busca, não trava a vitrine de anúncios
+        pass
