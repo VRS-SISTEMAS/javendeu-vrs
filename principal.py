@@ -177,4 +177,5 @@ else:
     elif st.session_state['pagina_vrs'] == "Admin":
         admin_vrs.exibir_painel_admin_vrs(db)
 
-    interface_javendeu_vrs.exibir_rodape_vrs()
+# RODAPÉ COM REGRAS DE SEGURANÇA CHAMADO EM TODAS AS PÁGINAS
+interface_javendeu_vrs.exibir_rodape_vrs()
