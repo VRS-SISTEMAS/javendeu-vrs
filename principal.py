@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE - VERSÃO BLINDADA)
+# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE - VERSÃO FINAL BLINDADA)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -39,6 +39,7 @@ st.markdown("""
     .ponto-online { height: 10px; width: 10px; background-color: #00FF00; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 8px #00FF00; }
     .status-online-vrs { color: #00FF00; font-weight: bold; font-size: 14px; }
     
+    /* Botão de Negociação Destacado - O coração da venda */
     div.stButton > button:first-child[aria-label="💬 NEGOCIAR NO CHAT"] {
         background-color: #FF4B4B !important;
         color: white !important;
@@ -58,7 +59,7 @@ col_vazia, col_login = st.columns([8, 2])
 with col_login:
     if db is not None: usuarios_vrs.gerenciar_acesso(db)
 
-# Menu Lateral (Anunciar, Meus Anúncios, Chat, Home)
+# Menu Lateral (Home, Anunciar, Meus Anúncios, Chat)
 interface_javendeu_vrs.obter_menu_lateral_vrs()
 
 # --- TRAVA DE SEGURANÇA MESTRE: MENU ADMIN EXCLUSIVO DO VITOR ---
@@ -73,7 +74,7 @@ if st.session_state.get('logado') and st.session_state['usuario']['email'] == "v
 
 # --- SISTEMA DE NAVEGAÇÃO DE PÁGINAS ---
 if st.session_state['anuncio_detalhe']:
-    # TELA DE DETALHES DO PRODUTO
+    # TELA DE DETALHES DO PRODUTO (RESTAURADA E COMPLETA)
     item = st.session_state['anuncio_detalhe']
     st.markdown(f"## {item.get('titulo', 'ANÚNCIO').upper()}")
     col_img, col_info = st.columns([1.5, 1])
@@ -89,15 +90,32 @@ if st.session_state['anuncio_detalhe']:
         with st.container(border=True):
             preco = item.get('preco', 0.0)
             st.markdown(f"<h1 style='color: #FF4B4B; margin:0;'>R$ {preco:.2f}</h1>", unsafe_allow_html=True)
+            v_nome = item.get('vendedor_nome', 'Usuário').split()[0].title()
+            st.markdown(f"👤 **Vendedor:** {v_nome} | <span class='status-online-vrs'><span class='ponto-online'></span>ONLINE</span>", unsafe_allow_html=True)
             # LOCALIZAÇÃO NA TELA DE DETALHES
             st.markdown(f"📍 **{item.get('cidade', 'N/I')} - {item.get('estado', 'N/I')}**")
             st.write(item.get('descricao', 'Sem descrição disponível.'))
             
+            # --- BOTÃO DE CHAT COM TRAVAS DE SEGURANÇA MESTRE ---
+            if st.button("💬 NEGOCIAR NO CHAT", use_container_width=True):
+                if not st.session_state.get('logado'):
+                    st.warning("⚠️ Você precisa estar logado para negociar!")
+                elif item['vendedor_email'] == st.session_state['usuario']['email']:
+                    st.error("🚫 Você não pode negociar seu próprio produto!")
+                else:
+                    # Configura a sessão do chat para iniciar a conversa
+                    st.session_state['vrs_chat_ativo'] = item['vendedor_email']
+                    st.session_state['vrs_nome_ativo'] = v_nome
+                    st.session_state['vrs_produto_atual'] = item['titulo']
+                    st.session_state['pagina_vrs'] = "Chat"
+                    st.session_state['anuncio_detalhe'] = None
+                    st.rerun()
+
             if st.button("⬅️ VOLTAR PARA VITRINE", use_container_width=True):
                 st.session_state['anuncio_detalhe'] = None
                 st.rerun()
 else:
-    # NAVEGAÇÃO PRINCIPAL
+    # NAVEGAÇÃO PRINCIPAL (HOME)
     if st.session_state['pagina_vrs'] == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
         st.markdown("---")
@@ -120,7 +138,6 @@ else:
                 lista_anuncios = []
                 for d in docs:
                     it = d.to_dict()
-                    # Filtro de busca
                     if (cat_f == "Todas" or it.get('categoria') == cat_f) and \
                        (est_f == "Brasil" or it.get('estado') == est_f) and \
                        (not cid_f or cid_f in it.get('cidade', '')):
@@ -143,16 +160,16 @@ else:
                                 preco_card = anuncio.get('preco', 0.0)
                                 st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {preco_card:.2f}</h4>", unsafe_allow_html=True)
                                 
-                                # LOCALIZAÇÃO NOS CARDS
+                                # LOCALIZAÇÃO NOS CARDS (Sempre visível)
                                 st.caption(f"📍 {anuncio.get('cidade', 'N/I')} - {anuncio.get('estado', 'N/I')}")
                                 
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
-        except Exception as e: 
-            st.error("Erro ao carregar a vitrine. Verifique a conexão com o banco.")
+        except: 
+            st.error("Erro ao carregar a vitrine. Verifique a conexão.")
 
-    # --- PÁGINAS DE GESTÃO E CHAT ---
+    # --- PÁGINAS DE GESTÃO, CHAT E ADMIN ---
     elif st.session_state['pagina_vrs'] in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
     

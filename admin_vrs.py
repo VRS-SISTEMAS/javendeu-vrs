@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: admin_vrs.py (PAINEL ADMINISTRATIVO MASTER)
+# MÓDULO: admin_vrs.py (PAINEL ADMINISTRATIVO MASTER - RESTAURADO)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -16,7 +16,7 @@ def exibir_painel_admin_vrs(db):
 
     st.markdown(f"<h1 style='color: #FF4B4B;'>🛠️ Gestão Master - VRS SOLUÇÕES</h1>", unsafe_allow_html=True)
     
-    # Métricas Reais
+    # Métricas Reais do Banco
     c1, c2, c3 = st.columns(3)
     try:
         c1.metric("Anúncios Ativos", len(list(db.collection("anuncios").where("status", "==", "ativo").stream())))
@@ -50,4 +50,5 @@ def exibir_painel_admin_vrs(db):
                     st.rerun()
 
     with tab_pub:
+        # Garante que a gestão de publicidade esteja integrada ao Admin
         publicidade_clientes.gerenciar_banners_vrs(db)
