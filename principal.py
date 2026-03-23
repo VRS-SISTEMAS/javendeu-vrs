@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE NACIONAL - VERSÃO ESTÁVEL)
+# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE NACIONAL - COMPLETO)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -132,7 +132,7 @@ else:
 
         # --- INTEGRAÇÃO DE PUBLICIDADE: Exibição do banner inteligente ---
         if db:
-            # Mostra banners baseados no estado selecionado ou banners nacionais
+            # Chama a função de exibição do módulo publicidade_clientes
             publicidade_clientes.exibir_banner_rotativo_vrs(db, estado_atual=est_f)
 
         try:

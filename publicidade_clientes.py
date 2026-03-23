@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: publicidade_clientes.py (GESTÃO DE BANNERS - CORRIGIDO)
+# MÓDULO: publicidade_clientes.py (GESTÃO DE BANNERS - VERSÃO FINAL)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -65,10 +65,9 @@ def gerenciar_banners_vrs(db):
         st.info("Nenhum banner cadastrado ainda.")
 
 def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
-    """Exibe o banner na Home baseado no filtro de estado."""
+    """Exibe o banner na Home baseado no filtro de estado (LÓGICA FLEXÍVEL)."""
     try:
-        # Lógica corrigida: busca banners 'Brasil' OU o estado selecionado
-        # Isso garante que o banner apareça mesmo que o filtro mude
+        # Busca banners 'Brasil' OU o estado selecionado pelo usuário
         filtros_busca = ["Brasil"]
         if estado_atual != "Brasil":
             filtros_busca.append(estado_atual)
@@ -77,10 +76,9 @@ def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
         lista_banners = [b.to_dict() | {"id": b.id} for b in query]
         
         if lista_banners:
-            # Pega o banner mais recente cadastrado para dar rotatividade
+            # Pega o último banner ativo para exibição
             banner = lista_banners[-1] 
             
-            # HTML para tornar o banner clicável
             html_banner = f"""
                 <a href="{banner['link']}" target="_blank" style="text-decoration: none;">
                     <div style="width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid #333; margin-bottom: 20px; box-shadow: 0px 4px 15px rgba(0,0,0,0.5);">
@@ -89,6 +87,5 @@ def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
                 </a>
             """
             st.markdown(html_banner, unsafe_allow_html=True)
-    except Exception as e:
-        # Se houver erro na busca, não trava a vitrine de anúncios
+    except:
         pass
