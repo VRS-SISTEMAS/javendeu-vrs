@@ -39,7 +39,7 @@ st.markdown("""
     .ponto-online { height: 10px; width: 10px; background-color: #00FF00; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 8px #00FF00; }
     .status-online-vrs { color: #00FF00; font-weight: bold; font-size: 14px; }
     
-    /* Botão de Negociação Destacado - O coração da venda */
+    /* Botão de Negociação Destacado - O coração da venda VRS */
     div.stButton > button:first-child[aria-label="💬 NEGOCIAR NO CHAT"] {
         background-color: #FF4B4B !important;
         color: white !important;
@@ -96,14 +96,13 @@ if st.session_state['anuncio_detalhe']:
             st.markdown(f"📍 **{item.get('cidade', 'N/I')} - {item.get('estado', 'N/I')}**")
             st.write(item.get('descricao', 'Sem descrição disponível.'))
             
-            # --- BOTÃO DE CHAT COM TRAVAS DE SEGURANÇA MESTRE ---
+            # --- BOTÃO DE CHAT COM TRAVAS DE SEGURANÇA MESTRE (RESTAURADO!) ---
             if st.button("💬 NEGOCIAR NO CHAT", use_container_width=True):
                 if not st.session_state.get('logado'):
                     st.warning("⚠️ Você precisa estar logado para negociar!")
                 elif item['vendedor_email'] == st.session_state['usuario']['email']:
                     st.error("🚫 Você não pode negociar seu próprio produto!")
                 else:
-                    # Configura a sessão do chat para iniciar a conversa
                     st.session_state['vrs_chat_ativo'] = item['vendedor_email']
                     st.session_state['vrs_nome_ativo'] = v_nome
                     st.session_state['vrs_produto_atual'] = item['titulo']
@@ -131,7 +130,7 @@ else:
         if db:
             publicidade_clientes.exibir_banner_rotativo_vrs(db, estado_atual=est_f)
 
-        # --- CARREGAMENTO DA VITRINE BLINDADA ---
+        # --- CARREGAMENTO DA VITRINE BLINDADA (SEM ERRO VERMELHO) ---
         try:
             if db:
                 docs = db.collection("anuncios").where("status", "==", "ativo").stream()
@@ -160,16 +159,15 @@ else:
                                 preco_card = anuncio.get('preco', 0.0)
                                 st.markdown(f"<h4 style='color: #FF4B4B;'>R$ {preco_card:.2f}</h4>", unsafe_allow_html=True)
                                 
-                                # LOCALIZAÇÃO NOS CARDS (Sempre visível)
+                                # LOCALIZAÇÃO NOS CARDS (RESTAURADO)
                                 st.caption(f"📍 {anuncio.get('cidade', 'N/I')} - {anuncio.get('estado', 'N/I')}")
                                 
                                 if st.button("Ver Detalhes", key=f"vit_{anuncio['id']}", use_container_width=True):
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
-        except: 
-            st.error("Erro ao carregar a vitrine. Verifique a conexão.")
+        except Exception as e: 
+            st.error("Erro técnico ao carregar a vitrine. Verifique a conexão com o banco.")
 
-    # --- PÁGINAS DE GESTÃO, CHAT E ADMIN ---
     elif st.session_state['pagina_vrs'] in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
     
