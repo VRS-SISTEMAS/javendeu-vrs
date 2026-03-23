@@ -25,6 +25,7 @@ def gerenciar_banners_vrs(db):
             
             if st.form_submit_button("✅ ATIVAR PUBLICIDADE", use_container_width=True):
                 if cliente and link and arq_banner:
+                    # Converte a imagem para base64 para salvar no Firestore
                     img_b64 = base64.b64encode(arq_banner.getvalue()).decode('utf-8')
                     
                     dados_banner = {
@@ -47,6 +48,7 @@ def gerenciar_banners_vrs(db):
     st.write("### Banners Ativos")
     
     try:
+        # Lista todos os banners cadastrados para o administrador gerenciar
         banners = db.collection("publicidade").stream()
         for b in banners:
             d = b.to_dict()
@@ -65,8 +67,9 @@ def gerenciar_banners_vrs(db):
         st.info("Nenhum banner cadastrado ainda.")
 
 def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
-    """Exibe o banner na Home com suporte a links e CSS customizado."""
+    """Exibe o banner na Home com suporte a links e CSS customizado da VRS."""
     try:
+        # Lógica de filtro: Sempre busca banners Nacionais ou do Estado selecionado
         filtros_busca = ["Brasil"]
         if estado_atual != "Brasil":
             filtros_busca.append(estado_atual)
@@ -75,13 +78,14 @@ def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
         lista_banners = [b.to_dict() | {"id": b.id} for b in query]
         
         if lista_banners:
+            # Seleciona o banner mais recente para exibição
             banner = lista_banners[-1] 
             
-            # HTML Ajustado com classe 'vrs-banner-fix' para o CSS reconhecer
+            # HTML com classe fixa para garantir que o CSS da interface aplique as dimensões corretas
             html_banner = f"""
-                <div class="vrs-banner-fix">
+                <div class="vrs-banner-container-fix">
                     <a href="{banner['link']}" target="_blank">
-                        <img src="data:image/jpeg;base64,{banner['foto']}">
+                        <img src="data:image/jpeg;base64,{banner['foto']}" style="width: 100%; border-radius: 10px; border: 1px solid #333;">
                     </a>
                 </div>
             """
