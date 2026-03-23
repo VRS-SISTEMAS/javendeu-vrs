@@ -1,6 +1,6 @@
 # =================================================================
-# VRS SISTEMAS - JÁ VENDEU?
-# MÓDULO: principal.py (VERSÃO CORRIGIDA COM BOTÃO NEGOCIAR NO CHAT)
+# VRS SOLUÇÕES - JÁ VENDEU?
+# MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE NACIONAL)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -8,8 +8,10 @@ import importlib
 import base64
 import datetime
 
+# Configuração inicial obrigatória da página
 st.set_page_config(page_title="JÁ VENDEU? - Marketplace VRS", layout="wide", initial_sidebar_state="expanded")
 
+# Importação dos módulos do sistema VRS
 import conexao
 import interface_javendeu_vrs
 import usuarios_vrs
@@ -18,14 +20,16 @@ import categorias
 import chat 
 import admin_vrs 
 
+# Forçar recarregamento para aplicar alterações em tempo real
 importlib.reload(usuarios_vrs)
 importlib.reload(anuncios_vrs)
 importlib.reload(admin_vrs)
 
+# Aplicação da Identidade Visual VRS
 interface_javendeu_vrs.aplicar_estilo_vrs()
 db = conexao.conectar_banco_vrs()
 
-# CSS MESTRE (MANTIDO E AJUSTADO PARA O NOVO BOTÃO)
+# CSS MESTRE - ESTILIZAÇÃO CUSTOMIZADA
 st.markdown("""
     <style>
     .moldura-foto-vrs { background-color: #0E1117; border: 1px solid #333; border-radius: 10px; height: 400px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -33,7 +37,7 @@ st.markdown("""
     .ponto-online { height: 10px; width: 10px; background-color: #00FF00; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 8px #00FF00; }
     .status-online-vrs { color: #00FF00; font-weight: bold; font-size: 14px; }
     
-    /* Botão de Negociação Destacado */
+    /* Botão de Negociação Destacado - Identidade VRS */
     div.stButton > button:first-child[aria-label="💬 NEGOCIAR NO CHAT"] {
         background-color: #FF4B4B !important;
         color: white !important;
@@ -44,16 +48,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Inicialização de variáveis de estado
 if 'pagina_vrs' not in st.session_state: st.session_state['pagina_vrs'] = "Home"
 if 'anuncio_detalhe' not in st.session_state: st.session_state['anuncio_detalhe'] = None
 
+# Cabeçalho de Login
 col_vazia, col_login = st.columns([8, 2])
 with col_login:
     if db is not None: usuarios_vrs.gerenciar_acesso(db)
 
+# Menu Lateral de Navegação
 interface_javendeu_vrs.obter_menu_lateral_vrs()
 
-# --- TRAVA DE SEGURANÇA MESTRE: MENU ADMIN EXCLUSIVO DO VITOR ---
+# --- TRAVA DE SEGURANÇA MESTRE: MENU ADMIN EXCLUSIVO DO VITOR (VRS SOLUÇÕES) ---
 if st.session_state.get('logado') and st.session_state['usuario']['email'] == "vrsolucoes.sistemas@gmail.com":
     with st.sidebar:
         st.markdown("---")
@@ -63,7 +70,7 @@ if st.session_state.get('logado') and st.session_state['usuario']['email'] == "v
             st.session_state['anuncio_detalhe'] = None
             st.rerun()
 
-# --- DETALHES DO PRODUTO (AJUSTADO COM BOTÃO NEGOCIAR) ---
+# --- TELA DE DETALHES DO PRODUTO ---
 if st.session_state['anuncio_detalhe']:
     item = st.session_state['anuncio_detalhe']
     anuncios_vrs.exibir_alerta_seguranca_vrs()
@@ -87,14 +94,13 @@ if st.session_state['anuncio_detalhe']:
             st.markdown(f"📍 **{item.get('cidade')} - {item.get('estado')}**")
             st.write(item.get('descricao'))
             
-            # --- NOVO BOTÃO DE NEGOCIAÇÃO (A SOLUÇÃO) ---
+            # Botão de Negociação (Encaminha para o Chat em tempo real)
             if st.button("💬 NEGOCIAR NO CHAT", use_container_width=True):
                 if not st.session_state.get('logado'):
                     st.warning("⚠️ Você precisa estar logado para negociar!")
                 elif item['vendedor_email'] == st.session_state['usuario']['email']:
                     st.error("🚫 Você não pode negociar seu próprio produto!")
                 else:
-                    # Prepara a transição para o Chat
                     st.session_state['vrs_chat_ativo'] = item['vendedor_email']
                     st.session_state['vrs_nome_ativo'] = v_nome
                     st.session_state['vrs_produto_atual'] = item['titulo']
@@ -106,11 +112,13 @@ if st.session_state['anuncio_detalhe']:
                 st.session_state['anuncio_detalhe'] = None
                 st.rerun()
 
-# --- NAVEGAÇÃO DE PÁGINAS ---
+# --- SISTEMA DE NAVEGAÇÃO DE PÁGINAS ---
 else:
     if st.session_state['pagina_vrs'] == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
         st.markdown("---")
+        
+        # Filtros de busca com suporte Nacional
         st.subheader("🛍️ Vitrine de Ofertas")
         f1, f2, f3 = st.columns([2, 1, 2])
         cat_f = f1.selectbox("O que você procura?", ["Todas"] + categorias.obter_categorias_vrs())
@@ -119,26 +127,31 @@ else:
 
         try:
             if db:
+                # Busca ativa no Firestore
                 docs = db.collection("anuncios").where("status", "==", "ativo").stream()
                 lista_anuncios = []
                 for d in docs:
                     it = d.to_dict()
+                    # Lógica de Filtro Nacional (VRS Soluções)
                     if (cat_f == "Todas" or it.get('categoria') == cat_f) and \
                        (est_f == "Brasil" or it.get('estado') == est_f) and \
                        (not cid_f or cid_f in it.get('cidade', '')):
                         lista_anuncios.append(it | {"id": d.id})
 
+                # Ordenação: VIPs aparecem primeiro na vitrine
                 lista_anuncios = sorted(lista_anuncios, key=lambda x: x.get('vip', False), reverse=True)
 
                 if not lista_anuncios:
-                    st.warning("🧐 Nenhuma oferta encontrada.")
+                    st.warning("🧐 Nenhuma oferta encontrada para esta região.")
                 else:
+                    # Exibição em Grid (4 colunas)
                     cols = st.columns(4) 
                     for idx, anuncio in enumerate(lista_anuncios):
                         with cols[idx % 4]:
                             with st.container(border=True):
                                 if anuncio.get('vip'):
                                     st.markdown("<span style='background:#FF4B4B; color:white; padding:2px 5px; border-radius:3px; font-size:10px;'>⭐ DESTAQUE</span>", unsafe_allow_html=True)
+                                
                                 f_capa = anuncio['fotos'][0] if anuncio.get('fotos') else (anuncio['foto'] if anuncio.get('foto') else "")
                                 if f_capa: 
                                     st.image(f"data:image/jpeg;base64,{f_capa}", use_container_width=True)
@@ -151,7 +164,7 @@ else:
                                     st.session_state['anuncio_detalhe'] = anuncio
                                     st.rerun()
         except Exception as e: 
-            st.error(f"Erro ao carregar vitrine.")
+            st.error(f"Erro ao carregar a vitrine VRS.")
             
     elif st.session_state['pagina_vrs'] in ["Anunciar", "Meus Anúncios"]:
         anuncios_vrs.exibir_painel_vendedor(db)
@@ -160,4 +173,5 @@ else:
     elif st.session_state['pagina_vrs'] == "Admin":
         admin_vrs.exibir_painel_admin_vrs(db)
 
+    # Rodapé Padrão VRS
     interface_javendeu_vrs.exibir_rodape_vrs()
