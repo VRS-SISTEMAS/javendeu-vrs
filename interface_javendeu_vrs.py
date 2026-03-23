@@ -1,7 +1,6 @@
 # =================================================================
-# VRS SISTEMAS
-# JÁ VENDEU? - INTERFACE MESTRE COM DESIGN OLX STYLE
-# MÓDULO: interface_javendeu_vrs.py
+# VRS SISTEMAS - JÁ VENDEU?
+# MÓDULO: interface_javendeu_vrs.py (VERSÃO OTIMIZADA PARA BANNERS)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -52,6 +51,7 @@ def aplicar_estilo_vrs():
         header[data-testid="stHeader"] { background: rgba(0,0,0,0); }
 
         /* --- DESIGN OLX: CONTROLE DE IMAGEM --- */
+        /* Ajustado para não afetar banners de publicidade clicáveis */
         .stImage > img {
             max-height: 480px !important;
             width: auto !important;
@@ -62,6 +62,19 @@ def aplicar_estilo_vrs():
             object-fit: contain;
             background-color: #0E1117;
             border: 1px solid #333;
+        }
+
+        /* Estilo específico para Banners de Publicidade para evitar bloqueios visuais */
+        div[data-testid="stMarkdownContainer"] a img {
+            max-height: none !important;
+            width: 100% !important;
+            border-radius: 10px !important;
+            transition: transform 0.3s ease;
+        }
+        
+        div[data-testid="stMarkdownContainer"] a img:hover {
+            transform: scale(1.01);
+            border-color: #FF4B4B !important;
         }
 
         /* Galeria de miniaturas */
@@ -127,6 +140,9 @@ def exibir_rodape_vrs():
 
 def obter_menu_lateral_vrs():
     """Gerencia a navegação através da barra lateral."""
+    if 'pagina_vrs' not in st.session_state:
+        st.session_state['pagina_vrs'] = "Home"
+        
     with st.sidebar:
         st.markdown("<h2 style='color: #FF4B4B;'>MENU VRS</h2>", unsafe_allow_html=True)
         if st.button("🏠 HOME", key="menu_home", use_container_width=True):
