@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: publicidade_clientes.py (CARROSSEL AUTOMÁTICO 5s)
+# MÓDULO: publicidade_clientes.py (VERSÃO BLINDADA ANTI-QUEDA)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -10,12 +10,13 @@ import io
 import time
 from PIL import Image
 
-# Importante: Para o carrossel rodar sozinho no Streamlit, usamos o autorefresh
+# --- TRAVA DE SEGURANÇA MESTRE VRS ---
+# Tenta importar o carrossel. Se não conseguir, o site CONTINUA NO AR em modo estático.
 try:
     from streamlit_autorefresh import st_autorefresh
+    CARROSSEL_DISPONIVEL = True
 except ImportError:
-    st.error("🚨 Execute 'pip install streamlit-autorefresh' no terminal para ativar o carrossel.")
-    st.stop()
+    CARROSSEL_DISPONIVEL = False
 
 def gerenciar_banners_vrs(db):
     """Painel administrativo para o Vitor cadastrar publicidade paga."""
@@ -66,7 +67,7 @@ def gerenciar_banners_vrs(db):
 def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
     """
     EXIBIÇÃO EM CARROSSEL (TROCA A CADA 5 SEGUNDOS)
-    LÓGICA: Puxa todos os banners 'Brasil' e faz o rodízio.
+    BLINDAGEM: Se a biblioteca falhar, exibe apenas o último banner cadastrado.
     """
     try:
         # 1. Busca todos os banners nacionais ativos
@@ -76,20 +77,21 @@ def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
         if not lista_banners:
             return
 
-        # 2. Configura o Auto-Refresh (5000ms = 5 segundos)
-        # Isso faz a página atualizar silenciosamente para trocar o slide
-        st_autorefresh(interval=5000, key="carrossel_vrs")
-
-        # 3. Lógica de controle do Índice (qual banner mostrar agora)
-        if 'index_banner_vrs' not in st.session_state:
-            st.session_state.index_banner_vrs = 0
+        # 2. Lógica de Carrossel (Só ativa se a biblioteca foi instalada com sucesso)
+        if CARROSSEL_DISPONIVEL and len(lista_banners) > 1:
+            st_autorefresh(interval=5000, key="carrossel_vrs")
+            
+            if 'index_banner_vrs' not in st.session_state:
+                st.session_state.index_banner_vrs = 0
+            else:
+                st.session_state.index_banner_vrs = (st.session_state.index_banner_vrs + 1) % len(lista_banners)
+            
+            banner_atual = lista_banners[st.session_state.index_banner_vrs]
         else:
-            st.session_state.index_banner_vrs = (st.session_state.index_banner_vrs + 1) % len(lista_banners)
+            # Se a biblioteca NÃO estiver pronta ou só tiver 1 banner, mostra o mais recente
+            banner_atual = lista_banners[-1]
 
-        # Seleciona o banner atual baseado no índice
-        banner_atual = lista_banners[st.session_state.index_banner_vrs]
-
-        # 4. Renderização HTML com link e sombra
+        # 3. Renderização HTML com link e sombra
         st.markdown(f"""
             <div style="width:100%; margin-top: 5px; margin-bottom: 15px;">
                 <a href="{banner_atual['link']}" target="_blank">
@@ -100,5 +102,5 @@ def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
             </div>
         """, unsafe_allow_html=True)
         
-    except Exception as e:
-        pass # Blindagem para não parar o site se o banco oscilar
+    except Exception:
+        pass # Garante que nada quebre a vitrine
