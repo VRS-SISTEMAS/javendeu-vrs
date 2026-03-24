@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: publicidade_clientes.py (ALCANCE NACIONAL - BRASIL TODO)
+# MÓDULO: publicidade_clientes.py (CORREÇÃO DE GRAVAÇÃO E EXIBIÇÃO)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -8,63 +8,88 @@ import base64
 import datetime
 
 def gerenciar_banners_vrs(db):
-    """Painel administrativo para o Vitor cadastrar publicidade paga."""
+    """Painel para o Vitor cadastrar publicidade paga."""
     st.subheader("🚀 Gestão de Banners")
-    with st.expander("➕ Novo Banner de Cliente"):
+    
+    # Formulário para novo banner
+    with st.expander("➕ Novo Banner de Cliente", expanded=True):
         with st.form("f_banner_vrs", clear_on_submit=True):
             cliente = st.text_input("Nome do Cliente")
             link = st.text_input("Link WhatsApp/Site (com https://)")
-            # Opção 'Brasil' é a padrão para alcance nacional
             uf = st.selectbox("Estado Alvo", ["Brasil", "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
-            arq = st.file_uploader("Upload do Banner (Recomendado: 1200x200px)", type=['png', 'jpg', 'jpeg'])
+            # Simplificamos o label para evitar erros de leitura do componente
+            arq = st.file_uploader("Selecione a imagem do banner", type=['png', 'jpg', 'jpeg'])
             
-            if st.form_submit_button("ATIVAR PUBLICIDADE"):
+            enviar = st.form_submit_button("ATIVAR PUBLICIDADE")
+            
+            if enviar:
                 if cliente and link and arq:
-                    img = base64.b64encode(arq.getvalue()).decode('utf-8')
-                    db.collection("publicidade").add({
-                        "cliente": cliente, 
-                        "link": link, 
-                        "estado_alvo": uf,
-                        "foto": img, 
-                        "data": datetime.datetime.now()
-                    })
-                    st.success("Banner ativado com sucesso!")
-                    st.rerun()
+                    try:
+                        # Converte a imagem para Base64
+                        img_b64 = base64.b64encode(arq.getvalue()).decode('utf-8')
+                        
+                        # GRAVAÇÃO NO BANCO VRS
+                        db.collection("publicidade").add({
+                            "cliente": cliente,
+                            "link": link,
+                            "estado_alvo": uf,
+                            "foto": img_b64,
+                            "data_cadastro": datetime.datetime.now()
+                        })
+                        st.success(f"✅ Banner de {cliente} ativado com sucesso!")
+                        # Não damos rerun aqui para o usuário ver a mensagem de sucesso
+                    except Exception as e:
+                        st.error(f"❌ Erro ao gravar no banco: {e}")
+                else:
+                    st.warning("⚠️ Preencha todos os campos e selecione uma imagem.")
 
-    # Listagem para remoção
-    banners = db.collection("publicidade").order_by("data", direction="DESCENDING").stream()
-    for b in banners:
-        d = b.to_dict()
-        with st.container(border=True):
-            st.image(f"data:image/jpeg;base64,{d['foto']}", width=300)
-            st.write(f"Cliente: {d['cliente']} | Alvo: {d['estado_alvo']}")
-            if st.button("🗑️ Remover Banner", key=f"del_pub_{b.id}"):
-                db.collection("publicidade").document(b.id).delete()
-                st.rerun()
+    st.markdown("---")
+    st.subheader("📋 Banners Ativos")
+    
+    # Listagem de banners existentes
+    try:
+        banners_ref = db.collection("publicidade").order_by("data_cadastro", direction="DESCENDING").stream()
+        lista_vazia = True
+        
+        for b in banners_ref:
+            lista_vazia = False
+            d = b.to_dict()
+            with st.container(border=True):
+                col_img, col_txt = st.columns([1, 2])
+                with col_img:
+                    st.image(f"data:image/jpeg;base64,{d['foto']}", use_container_width=True)
+                with col_txt:
+                    st.write(f"**Cliente:** {d['cliente']}")
+                    st.write(f"**Alvo:** {d['estado_alvo']}")
+                    if st.button("🗑️ Remover", key=f"del_{b.id}"):
+                        db.collection("publicidade").document(b.id).delete()
+                        st.rerun()
+        
+        if lista_vazia:
+            st.info("Nenhum banner cadastrado no momento.")
+            
+    except Exception as e:
+        st.caption(f"Aguardando novos banners... (Log: {e})")
 
 def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
-    """
-    Exibe o banner na vitrine. 
-    LÓGICA NACIONAL: Sempre busca banners marcados como 'Brasil' para aparecer para todos.
-    """
+    """Exibe o banner nacional no topo da vitrine."""
     try:
-        # Busca banners com alvo 'Brasil' (Independente do filtro do usuário)
+        # Busca banners com alvo 'Brasil' para alcance nacional
         query = db.collection("publicidade").where("estado_alvo", "==", "Brasil").stream()
         lista_banners = [b.to_dict() for b in query]
         
         if lista_banners:
-            # Exibe o banner mais recente (o último da lista)
+            # Pega o banner mais recente
             banner = lista_banners[-1]
             
-            # HTML com classe CSS da VRS para ajuste de tela
+            # Injeta o HTML na interface
             st.markdown(f"""
-                <div class="vrs-banner-fix" style="width:100%; margin-top: 10px; margin-bottom: 30px;">
+                <div style="width:100%; margin-top: 10px; margin-bottom: 20px; text-align: center;">
                     <a href="{banner['link']}" target="_blank">
                         <img src="data:image/jpeg;base64,{banner['foto']}" 
-                             style="width:100%; border-radius:10px; border: 1px solid #333; box-shadow: 0px 4px 15px rgba(0,0,0,0.5);">
+                             style="width:100%; border-radius:10px; border: 1px solid #333; box-shadow: 0px 5px 15px rgba(0,0,0,0.3);">
                     </a>
                 </div>
             """, unsafe_allow_html=True)
-    except Exception as e:
-        # Falha silenciosa para não quebrar a vitrine com o erro vermelho
-        pass
+    except Exception:
+        pass # Falha silenciosa para não quebrar a Home
