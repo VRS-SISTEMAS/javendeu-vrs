@@ -1,6 +1,6 @@
 # =================================================================
 # VRS SOLUÇÕES - JÁ VENDEU?
-# MÓDULO: publicidade_clientes.py (VERSÃO ESTABILIZADA)
+# MÓDULO: publicidade_clientes.py (VERSÃO TANQUE DE GUERRA)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
 import streamlit as st
@@ -11,7 +11,9 @@ import time
 from PIL import Image
 
 def gerenciar_banners_vrs(db):
+    """Painel administrativo para o Vitor cadastrar publicidade."""
     st.subheader("🚀 Gestão de Banners - VRS Soluções")
+    
     with st.expander("➕ Novo Banner de Cliente", expanded=False):
         cliente = st.text_input("Nome do Cliente", key="vrs_pub_nome")
         link = st.text_input("Link WhatsApp/Site", key="vrs_pub_link")
@@ -27,22 +29,26 @@ def gerenciar_banners_vrs(db):
                     buffer = io.BytesIO()
                     img_redimensionada.save(buffer, format="JPEG", quality=85)
                     img_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    
                     db.collection("publicidade").add({
                         "cliente": cliente, "link": link, "estado_alvo": uf,
                         "foto": img_b64, "data_cadastro": datetime.datetime.now()
                     })
-                    st.success("✅ Banner ativado!")
+                    st.success(f"✅ Banner de '{cliente}' ativado!")
                     st.rerun()
                 except Exception as e: st.error(f"Erro: {e}")
 
 def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
+    """Exibição em carrossel nativo (Troca a cada 7 segundos)."""
     try:
         query = db.collection("publicidade").where("estado_alvo", "==", "Brasil").stream()
         lista_banners = [b.to_dict() for b in query]
-        if not lista_banners: return
+        
+        if not lista_banners:
+            return
 
-        # Carrossel Nativo baseado no relógio (5 segundos)
-        indice = (int(time.time()) // 5) % len(lista_banners)
+        # Rotação baseada no tempo do sistema (mais estável)
+        indice = (int(time.time()) // 7) % len(lista_banners)
         banner = lista_banners[indice]
 
         st.markdown(f"""
@@ -54,4 +60,5 @@ def exibir_banner_rotativo_vrs(db, estado_atual="Brasil"):
                 </a>
             </div>
         """, unsafe_allow_html=True)
-    except: pass
+    except:
+        pass
