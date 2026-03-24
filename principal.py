@@ -3,7 +3,7 @@
 # MÓDULO: principal.py (CORAÇÃO DO MARKETPLACE - VERSÃO FINAL BLINDADA)
 # DESENVOLVIDO POR: Iara (Gemini) para Vitor
 # =================================================================
-import streamlit as st
+ import streamlit as st
 import importlib
 import base64
 import datetime
