@@ -117,6 +117,11 @@ else:
     # NAVEGAÇÃO PRINCIPAL (HOME)
     if st.session_state['pagina_vrs'] == "Home":
         interface_javendeu_vrs.exibir_identidade_visual_vrs()
+        
+        # --- BANNER PUBLICITÁRIO INTELIGENTE (MOVIDO PARA ABAIXO DA IDENTIDADE VISUAL) ---
+        if db:
+            publicidade_clientes.exibir_banner_rotativo_vrs(db)
+            
         st.markdown("---")
         
         # Filtros de busca
@@ -125,10 +130,6 @@ else:
         cat_f = f1.selectbox("O que você procura?", ["Todas"] + categorias.obter_categorias_vrs())
         est_f = f2.selectbox("Estado", ["Brasil"] + anuncios_vrs.ESTADOS_BR)
         cid_f = f3.text_input("Cidade (opcional)").strip().title()
-
-        # --- BANNER PUBLICITÁRIO INTELIGENTE ---
-        if db:
-            publicidade_clientes.exibir_banner_rotativo_vrs(db, estado_atual=est_f)
 
         # --- CARREGAMENTO DA VITRINE BLINDADA (SEM ERRO VERMELHO) ---
         try:
